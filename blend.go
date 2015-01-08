@@ -13,8 +13,8 @@ import (
 )
 
 func main() {
-	uri := flag.String("uri", "", "URI for the storage backend. Default for cassandra is localhost (9042) and local as tmp.db")
-	backend := flag.String("backend", "memory", "Storage backend for storing graph vertices. Default is cassandra, otherwise its always local")
+	backend := flag.String("backend", "memory", "Storage backend for storing graph vertices. Memory for now. Cassandra and local storage options comming soon")
+	uri := flag.String("uri", "", "URI for the storage backend. IF the storage backend is cassandra then the URI will be the IP of a cassandra node. If the backend is local storage then the URI will be the path to the database file. Leave the URI to be blank for in memory storage backend.")
 	listen := flag.String("port", ":8080", "Port and host for api server to listen on")
 	drop := flag.Bool("drop", false, "Recreate the cassandra schema")
 
@@ -60,7 +60,7 @@ func main() {
 
 	grouter.HandleFunc("/edge", handlers.CreateEdge).Methods("POST")
 
-	// TODO: Hide the ability to create arbritary vertices, root nodes will be introduced soon.
+	// TODO: Hide the ability to create arbritary vertices as root nodes will be introduced soon.
 	grouter.HandleFunc("/vertex", handlers.CreateVertex).Methods("POST")
 
 	grouter.HandleFunc("/vertex/{vertex_id}", handlers.GetVertex).Methods("GET")
