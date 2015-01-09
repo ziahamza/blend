@@ -152,11 +152,11 @@ func AddVertex(vertex *Vertex) error {
 	return err
 }
 
-func DeleteVertexLeaf(vertex *Vertex) error {
-	return backend.DeleteVertex(vertex)
+func DeleteVertex(vertex *Vertex) error {
+	return DeleteVertexTree([]*Vertex{vertex})
 }
 
-func DeleteVertexTree(vertices []Vertex) error {
+func DeleteVertexTree(vertices []*Vertex) error {
 	if len(vertices) == 0 {
 		return nil
 	}
@@ -172,16 +172,15 @@ func DeleteVertexTree(vertices []Vertex) error {
 
 	// Breadth first deletion
 	for _, edge := range backEdges {
-		vertices = append(vertices, Vertex{Id: edge.To})
+		vertices = append(vertices, &Vertex{Id: edge.To})
 	}
-
 	err = DeleteVertexTree(vertices)
 
 	if err != nil {
 		return err
 	}
 
-	return backend.DeleteVertex(&vertex)
+	return backend.DeleteVertex(vertex)
 }
 
 func AddVertexChild(vertex *Vertex, edge *Edge) error {

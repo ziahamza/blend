@@ -7,7 +7,7 @@ import (
 
 	"github.com/gorilla/mux"
 
-	"../db"
+	"github.com/ziahamza/blend/db"
 )
 
 func GetVertex(wr http.ResponseWriter, rq *http.Request) {
