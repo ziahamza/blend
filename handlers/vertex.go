@@ -5,10 +5,31 @@ import (
 	"fmt"
 	"net/http"
 
+	"io"
+
+	"golang.org/x/net/websocket"
+
 	"github.com/gorilla/mux"
 
 	"github.com/ziahamza/blend/db"
 )
+
+func ListenVertexEvents(wr http.ResponseWriter, rq *http.Request) {
+	vars := mux.Vars(rq)
+	vertex := &db.Vertex{Id: vars["vertex_id"]}
+
+	err := db.GetVertex(vertex, false)
+
+	if err != nil {
+		ErrorHandler(wr, rq, err.Error())
+		return
+	}
+
+	websocket.Handler(func(ws *websocket.Conn) {
+		// TODO, for now just an echo server
+		io.Copy(ws, ws)
+	}).ServeHTTP(wr, rq)
+}
 
 func GetVertex(wr http.ResponseWriter, rq *http.Request) {
 	vars := mux.Vars(rq)

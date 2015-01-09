@@ -12,6 +12,22 @@ import (
 	"github.com/ziahamza/blend/handlers"
 )
 
+func InitSchema() error {
+	rootVertex := &db.Vertex{
+		Id:         "root",
+		Name:       "root",
+		Type:       "root",
+		PrivateKey: "root",
+	}
+
+	err := db.AddVertex(rootVertex)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func main() {
 	backend := flag.String("backend", "memory", "Storage backend for storing graph vertices. Memory for now. Cassandra and local storage options comming soon")
 	uri := flag.String("uri", "", "URI for the storage backend. IF the storage backend is cassandra then the URI will be the IP of a cassandra node. If the backend is local storage then the URI will be the path to the database file. Leave the URI to be blank for in memory storage backend.")
@@ -34,6 +50,11 @@ func main() {
 	}
 
 	defer db.Close()
+
+	err = InitSchema()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	if *drop {
 		err = db.Drop()
@@ -68,6 +89,8 @@ func main() {
 	grouter.HandleFunc("/vertex/{vertex_id}", handlers.CreateChildVertex).Methods("POST")
 
 	grouter.HandleFunc("/vertex/{vertex_id}/edges", handlers.GetEdges).Methods("GET")
+
+	grouter.HandleFunc("/vertex/{vertex_id}/events", handlers.ListenVertexEvents).Methods("GET")
 
 	http.Handle("/", router)
 	fmt.Printf("Blend Graph listening on host %s\n", *listen)
