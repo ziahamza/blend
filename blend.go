@@ -8,8 +8,8 @@ import (
 
 	"github.com/gorilla/mux"
 
-	"./db"
-	"./handlers"
+	"github.com/ziahamza/blend/db"
+	"github.com/ziahamza/blend/handlers"
 )
 
 func main() {

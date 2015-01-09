@@ -71,7 +71,7 @@ func TestVertexTree(t *testing.T) {
 		return
 	}
 
-	err = DeleteVertexTree([]Vertex{*vertex})
+	err = DeleteVertex(vertex)
 	if err != nil {
 		t.Error(err.Error())
 		return
@@ -111,7 +111,7 @@ func TestAddDel(t *testing.T) {
 		return
 	}
 
-	err = DeleteVertexLeaf(vertex)
+	err = DeleteVertex(vertex)
 	if err != nil {
 		t.Error(err.Error())
 		return
