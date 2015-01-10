@@ -29,8 +29,16 @@ func InitSchema() error {
 }
 
 func main() {
-	backend := flag.String("backend", "memory", "Storage backend for storing graph vertices. Memory for now. Cassandra and local storage options comming soon")
-	uri := flag.String("uri", "", "URI for the storage backend. IF the storage backend is cassandra then the URI will be the IP of a cassandra node. If the backend is local storage then the URI will be the path to the database file. Leave the URI to be blank for in memory storage backend.")
+	backend := flag.String("backend", "memory",
+		`Storage backend for storing graph vertices.
+Memory for now. Cassandra and local storage options comming soon`)
+
+	uri := flag.String("uri", "",
+		`URI for the storage backend. IF the storage
+backend is cassandra then the URI will be the IP of a cassandra node.
+If the backend is local storage then the URI will be the path to the
+database file. Leave the URI to be blank for in memory storage backend.`)
+
 	listen := flag.String("port", ":8080", "Port and host for api server to listen on")
 	drop := flag.Bool("drop", false, "Recreate the cassandra schema")
 
@@ -45,7 +53,8 @@ func main() {
 	err = db.Init(*uri, &db.MemoryStorage{})
 
 	if err != nil {
-		fmt.Printf("Cannot connect to the storage backend on %s. Try passing a different URI for backend (%s) \n", *uri, err.Error())
+		fmt.Printf("Cannot connect to the storage backend on %s \n", *uri)
+		fmt.Printf("Try passing a different URI for backend (%s) \n", err.Error())
 		return
 	}
 
@@ -70,7 +79,8 @@ func main() {
 
 	router.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
 		writer.WriteHeader(200)
-		writer.Write([]byte("Blend: A distributed graph based filesystem for apps. Head over to /graph/help for api usage \n"))
+		writer.Write([]byte(
+			`Blend: A distributed graph based filesystem for apps. Head over to /graph/help for api usage \n`))
 	})
 
 	grouter := router.PathPrefix("/graph").Subrouter()
