@@ -9,6 +9,7 @@ import (
 	"github.com/gorilla/mux"
 
 	"github.com/ziahamza/blend/db"
+	"github.com/ziahamza/blend/events"
 	"github.com/ziahamza/blend/handlers"
 )
 
@@ -65,6 +66,8 @@ database file. Leave the URI to be blank for in memory storage backend.`)
 		log.Fatal(err)
 	}
 
+	events.Init()
+
 	if *drop {
 		err = db.Drop()
 		if err != nil {
@@ -103,6 +106,7 @@ database file. Leave the URI to be blank for in memory storage backend.`)
 	grouter.HandleFunc("/vertex/{vertex_id}/events", handlers.ListenVertexEvents).Methods("GET")
 
 	http.Handle("/", router)
+
 	fmt.Printf("Blend Graph listening on host %s\n", *listen)
 	err = http.ListenAndServe(*listen, nil)
 
