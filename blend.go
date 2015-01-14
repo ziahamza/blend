@@ -6,10 +6,8 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/gorilla/mux"
-
+	"github.com/ziahamza/blend/api"
 	"github.com/ziahamza/blend/db"
-	"github.com/ziahamza/blend/handlers"
 )
 
 func InitSchema() error {
@@ -74,35 +72,7 @@ database file. Leave the URI to be blank for in memory storage backend.`)
 		fmt.Println("Recreated Blend Schema and Root Vertices successfully!")
 	}
 
-	router := mux.NewRouter()
-	router.Headers("Access-Control-Allow-Origin", "*")
-
-	router.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
-		writer.WriteHeader(200)
-		writer.Write([]byte(
-			`Blend: A distributed graph based filesystem for apps. Head over to /graph/help for api usage \n`))
-	})
-
-	grouter := router.PathPrefix("/graph").Subrouter()
-
-	grouter.HandleFunc("/help", func(wr http.ResponseWriter, rq *http.Request) {
-		http.ServeFile(wr, rq, "./static/API.md")
-	})
-
-	grouter.HandleFunc("/edge", handlers.CreateEdge).Methods("POST")
-
-	// TODO: Hide the ability to create arbritary vertices as root nodes will be introduced soon.
-	grouter.HandleFunc("/vertex", handlers.CreateVertex).Methods("POST")
-
-	grouter.HandleFunc("/vertex/{vertex_id}", handlers.GetVertex).Methods("GET")
-
-	grouter.HandleFunc("/vertex/{vertex_id}", handlers.CreateChildVertex).Methods("POST")
-
-	grouter.HandleFunc("/vertex/{vertex_id}/edges", handlers.GetEdges).Methods("GET")
-
-	grouter.HandleFunc("/vertex/{vertex_id}/events", handlers.ListenVertexEvents).Methods("GET")
-
-	http.Handle("/", router)
+	http.Handle("/", api.Handler())
 	fmt.Printf("Blend Graph listening on host %s\n", *listen)
 	err = http.ListenAndServe(*listen, nil)
 
