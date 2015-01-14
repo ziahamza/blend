@@ -8,6 +8,7 @@ import (
 
 	"github.com/ziahamza/blend/api"
 	"github.com/ziahamza/blend/db"
+	"github.com/ziahamza/blend/events"
 )
 
 func InitSchema() error {
@@ -63,6 +64,8 @@ database file. Leave the URI to be blank for in memory storage backend.`)
 		log.Fatal(err)
 	}
 
+	events.Init()
+
 	if *drop {
 		err = db.Drop()
 		if err != nil {
@@ -73,6 +76,7 @@ database file. Leave the URI to be blank for in memory storage backend.`)
 	}
 
 	http.Handle("/", api.Handler())
+
 	fmt.Printf("Blend Graph listening on host %s\n", *listen)
 	err = http.ListenAndServe(*listen, nil)
 
