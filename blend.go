@@ -38,7 +38,7 @@ If the backend is local storage then the URI will be the path to the
 database file. Leave the URI to be blank for in memory storage backend.`)
 
 	listen := flag.String("port", ":8080", "Port and host for api server to listen on")
-	drop := flag.Bool("drop", false, "Recreate the cassandra schema")
+	drop := flag.Bool("drop", false, "reset the backend storage schema")
 
 	flag.Parse()
 
@@ -48,6 +48,8 @@ database file. Leave the URI to be blank for in memory storage backend.`)
 		err = db.Init(*uri, &db.MemoryStorage{})
 	} else if *backend == "local" {
 		err = db.Init(*uri, &db.BoltStorage{})
+	} else if *backend == "cassandra" {
+		err = db.Init(*uri, &db.CassandraStorage{})
 	} else {
 		log.Fatal("Backend not supported!")
 	}
