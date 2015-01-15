@@ -7,6 +7,8 @@ import "errors"
 import "encoding/json"
 import "bytes"
 
+import "os"
+
 import "fmt"
 
 type BoltStorage struct {
@@ -57,7 +59,9 @@ func (db *BoltStorage) Close() {
 func (db *BoltStorage) Drop() error {
 	db.Close()
 
-	return nil
+	os.Remove(db.path)
+
+	return db.Init(db.path)
 }
 
 func (db *BoltStorage) GetVertex(v *Vertex, private bool) error {
