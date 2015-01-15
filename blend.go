@@ -29,8 +29,7 @@ func InitSchema() error {
 
 func main() {
 	backend := flag.String("backend", "memory",
-		`Storage backend for storing graph vertices.
-Memory for now. Cassandra and local storage options comming soon`)
+		`Storage backend for the graph. Possible values include memory, local`)
 
 	uri := flag.String("uri", "",
 		`URI for the storage backend. IF the storage
@@ -45,11 +44,13 @@ database file. Leave the URI to be blank for in memory storage backend.`)
 
 	var err error
 
-	if *backend != "memory" {
-		log.Fatal("Specific backend not yet supported, use the memory default backend")
+	if *backend == "memory" {
+		err = db.Init(*uri, &db.MemoryStorage{})
+	} else if *backend == "local" {
+		err = db.Init(*uri, &db.BoltStorage{})
+	} else {
+		log.Fatal("Backend not supported!")
 	}
-
-	err = db.Init(*uri, &db.MemoryStorage{})
 
 	if err != nil {
 		fmt.Printf("Cannot connect to the storage backend on %s \n", *uri)

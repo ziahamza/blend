@@ -3,6 +3,11 @@ package db
 
 import "github.com/boltdb/bolt"
 import "time"
+import "errors"
+import "encoding/json"
+import "bytes"
+
+import "fmt"
 
 type BoltStorage struct {
 	store *bolt.DB
@@ -18,8 +23,28 @@ func (db *BoltStorage) Init(path string) error {
 
 	db.path = path
 
+	fmt.Printf("Using the boltdb as the local backend with dbpath=%s\n", path)
+
 	db.store, err = bolt.Open(path, 0666, &bolt.Options{
 		Timeout: 5 * time.Second,
+	})
+
+	if err != nil {
+		return err
+	}
+
+	err = db.store.Update(func(tx *bolt.Tx) error {
+		_, err := tx.CreateBucketIfNotExists([]byte("vertex"))
+		if err != nil {
+			return err
+		}
+
+		_, err = tx.CreateBucketIfNotExists([]byte("edge"))
+		if err != nil {
+			return err
+		}
+
+		return nil
 	})
 
 	return err
@@ -30,128 +55,129 @@ func (db *BoltStorage) Close() {
 }
 
 func (db *BoltStorage) Drop() error {
-	// for now do nothing
 	db.Close()
 
 	return nil
 }
 
-/*
-func (db *BoltStorage) getVertex(id string) *db.Vertex {
+func (db *BoltStorage) GetVertex(v *Vertex, private bool) error {
+	return db.store.View(func(tx *bolt.Tx) error {
+		vertexBucket := tx.Bucket([]byte("vertex"))
 
-}
+		vbytes := vertexBucket.Get([]byte(v.Id))
+		if vbytes == nil {
+			return errors.New("Vertex not found.")
+		}
 
-func (db *BoltStorage) getNode(id string) *Node {
-	node, ok := db.nodes[id]
-	if ok == false {
-		return nil
-	}
-
-	return node
-}
-
-func (db *BoltStorage) addNode(vertex *Vertex) *Node {
-	node := Node{
-		vertex: *vertex,
-		edges:  []Edge{},
-	}
-
-	db.nodes[vertex.Id] = &node
-
-	return &node
-}
-
-func (db *BoltStorage) delNode(vertex *Vertex) error {
-	if db.getNode(vertex.Id) == nil {
-		return errors.New("Unknown vertex id given for deletion")
-	}
-
-	delete(db.nodes, vertex.Id)
-
-	return nil
+		return json.Unmarshal(vbytes, v)
+	})
 }
 
 func (db *BoltStorage) GetEdges(e Edge) ([]Edge, error) {
 	edges := []Edge{}
-	node := db.getNode(e.From)
-	if node == nil {
-		return nil, errors.New("")
+
+	if len(e.Family) == 0 {
+		e.Family = "public"
 	}
 
-	for _, edge := range node.edges {
-		if edge.Family != e.Family {
-			continue
+	err := db.store.View(func(tx *bolt.Tx) error {
+		cursor := tx.Bucket([]byte("edge")).Cursor()
+
+		// format for edge key:
+		// vertexFromId:family:type:name
+
+		id := e.From + ":" + e.Family
+		if e.Type != "" {
+			id += ":" + e.Type
+
+			if e.Name != "" {
+				id += ":" + e.Name
+			}
 		}
 
-		if (len(e.Type) > 0) && edge.Type != e.Type {
-			continue
+		prefix := []byte(id)
+
+		for k, v := cursor.Seek(prefix); bytes.HasPrefix(k, prefix); k, v = cursor.Next() {
+			edge := Edge{}
+			json.Unmarshal(v, &edge)
+
+			edges = append(edges, edge)
 		}
 
-		if (len(e.Name) > 0) && edge.Name != e.Name {
-			continue
-		}
+		return nil
+	})
 
-		edges = append(edges, edge)
-	}
-
-	return edges, nil
+	return edges, err
 }
 
-func (db *BoltStorage) GetVertex(v *Vertex, private bool) error {
-	node := db.getNode(v.Id)
-	if node == nil {
-		return errors.New("Vertex not Found!")
-	}
-
-	fillVertex(&node.vertex, v, private)
-
-	return nil
-}
-
-func (db *BoltStorage) UpdateVertex(v *Vertex) error {
-	oldVertex := &Vertex{Id: v.Id}
-	err := db.GetVertex(oldVertex, true)
+func (db *BoltStorage) AddVertex(v *Vertex) error {
+	vbytes, err := json.Marshal(v)
 	if err != nil {
 		return err
 	}
 
-	v.PrivateKey = oldVertex.PrivateKey
-	fillVertex(v, oldVertex, true)
+	return db.store.Update(func(tx *bolt.Tx) error {
+		vertexBucket := tx.Bucket([]byte("vertex"))
+		vertexBucket.Put([]byte(v.Id), vbytes)
 
-	return nil
+		return nil
+	})
 }
 
-func (db *BoltStorage) AddVertex(v *Vertex) error {
-	_ = db.addNode(v)
-	return nil
+func (db *BoltStorage) UpdateVertex(v *Vertex) error {
+	vbytes, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	return db.store.Update(func(tx *bolt.Tx) error {
+		vertexBucket := tx.Bucket([]byte("vertex"))
+		vertexBucket.Put([]byte(v.Id), vbytes)
+		return nil
+	})
 }
 
-func (db *BoltStorage) AddEdge(edge *Edge) error {
+func (db *BoltStorage) AddEdge(e *Edge) error {
 	edges, err := GetEdges(Edge{
-		From:   edge.From,
-		Family: edge.Family,
-		Name:   edge.Name,
-		Type:   edge.Type,
+		From:   e.From,
+		Family: e.Family,
+		Name:   e.Name,
+		Type:   e.Type,
 	})
 
 	if err == nil && len(edges) > 0 {
-		edge.To = edges[0].To
+		e.To = edges[0].To
 
-		fmt.Println("edge found already, returning the old edge: ", edge.Family, ":", edge.Type, ":", edge.Name)
+		// edge already found, returning the old one
 		return nil
 	}
 
-	node := db.getNode(edge.From)
-	if node == nil {
-		return errors.New("Vertex not found!")
+	ebytes, err := json.Marshal(e)
+	if err != nil {
+		return err
 	}
 
-	node.edges = append(node.edges, *edge)
+	return db.store.Update(func(tx *bolt.Tx) error {
+		edgeBucket := tx.Bucket([]byte("edge"))
+		vertexBucket := tx.Bucket([]byte("vertex"))
 
-	return nil
+		if vertexBucket.Get([]byte(e.From)) == nil {
+			return errors.New("The edge from vertex not found")
+		}
+
+		edgeId := e.From + ":" + e.Family + ":" + e.Type + ":" + e.Name
+		edgeBucket.Put([]byte(edgeId), ebytes)
+
+		return nil
+	})
 }
 
 func (db *BoltStorage) DeleteVertex(v *Vertex) error {
-	return db.delNode(v)
+	return db.store.Update(func(tx *bolt.Tx) error {
+		vertexBucket := tx.Bucket([]byte("vertex"))
+
+		vertexBucket.Delete([]byte(v.Id))
+
+		return nil
+	})
 }
-*/

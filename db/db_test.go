@@ -2,14 +2,7 @@ package db
 
 import "testing"
 
-func TestVertexTree(t *testing.T) {
-	err := Init("./db", &MemoryStorage{})
-	if err != nil {
-		t.Error(err.Error())
-		return
-	}
-
-	defer Close()
+func testVertexTree(t *testing.T) {
 
 	vertex := &Vertex{
 		Name:       "TestRoot",
@@ -19,7 +12,7 @@ func TestVertexTree(t *testing.T) {
 		PrivateKey: "test key",
 	}
 
-	err = AddVertex(vertex)
+	err := AddVertex(vertex)
 	if err != nil {
 		t.Error(err.Error())
 		return
@@ -83,8 +76,8 @@ func TestVertexTree(t *testing.T) {
 	}
 }
 
-func TestAddDel(t *testing.T) {
-	err := Init("./db", &MemoryStorage{})
+func TestMemory(t *testing.T) {
+	err := Init("", &MemoryStorage{})
 	if err != nil {
 		t.Error(err.Error())
 		return
@@ -92,6 +85,24 @@ func TestAddDel(t *testing.T) {
 
 	defer Close()
 
+	testVertexTree(t)
+	testAddDel(t)
+}
+
+func TestBolt(t *testing.T) {
+	err := Init("./test.bolt.db", &BoltStorage{})
+	if err != nil {
+		t.Error(err.Error())
+		return
+	}
+
+	defer Close()
+
+	testVertexTree(t)
+	testAddDel(t)
+}
+
+func testAddDel(t *testing.T) {
 	vertex := &Vertex{
 		Name:       "TestAdd",
 		Type:       "test",
@@ -100,7 +111,7 @@ func TestAddDel(t *testing.T) {
 		PrivateKey: "test key",
 	}
 
-	err = AddVertex(vertex)
+	err := AddVertex(vertex)
 	if err != nil {
 		t.Error(err.Error())
 		return
