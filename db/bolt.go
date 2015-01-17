@@ -9,8 +9,6 @@ import "bytes"
 
 import "os"
 
-import "fmt"
-
 type BoltStorage struct {
 	store *bolt.DB
 	path  string
@@ -24,8 +22,6 @@ func (db *BoltStorage) Init(path string) error {
 	}
 
 	db.path = path
-
-	fmt.Printf("Using the boltdb as the local backend with dbpath=%s\n", path)
 
 	db.store, err = bolt.Open(path, 0666, &bolt.Options{
 		Timeout: 5 * time.Second,

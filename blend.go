@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"path"
 
 	"github.com/ziahamza/blend/api"
 	"github.com/ziahamza/blend/db"
@@ -28,14 +30,14 @@ func InitSchema() error {
 }
 
 func main() {
-	backend := flag.String("backend", "memory",
-		`Storage backend for the graph. Possible values include memory, local`)
+	backend := flag.String("backend", "local",
+		`Storage backend for the graph. Possible values include local, cassandra`)
 
-	uri := flag.String("uri", "",
+	uri := flag.String("uri", path.Join(os.TempDir(), "blend.db"),
 		`URI for the storage backend. IF the storage
 backend is cassandra then the URI will be the IP of a cassandra node.
 If the backend is local storage then the URI will be the path to the
-database file. Leave the URI to be blank for in memory storage backend.`)
+database file.`)
 
 	listen := flag.String("port", ":8080", "Port and host for api server to listen on")
 	drop := flag.Bool("drop", false, "reset the backend storage schema")
@@ -44,9 +46,7 @@ database file. Leave the URI to be blank for in memory storage backend.`)
 
 	var err error
 
-	if *backend == "memory" {
-		err = db.Init(*uri, &db.MemoryStorage{})
-	} else if *backend == "local" {
+	if *backend == "local" {
 		err = db.Init(*uri, &db.BoltStorage{})
 	} else if *backend == "cassandra" {
 		err = db.Init(*uri, &db.CassandraStorage{})
