@@ -29,26 +29,26 @@ func GetEdges(wr http.ResponseWriter, rq *http.Request) {
 	// confirm vertex data
 	if vkey == "" {
 		if !db.ConfirmVertex(edge.From) {
-			ErrorHandler(wr, rq, "Vertex with the specific id not found:"+edge.From)
+			ErrorHandler(wr, rq, APIResponse{Message: "Vertex with the specific id not found:" + edge.From})
 			return
 		}
 	} else {
 		if !db.ConfirmVertexKey(edge.From, vkey) {
-			ErrorHandler(wr, rq, "Wrong private key "+vkey+" supplied for source vertex "+edge.From)
+			ErrorHandler(wr, rq, APIResponse{Message: "Wrong private key " + vkey + " supplied for source vertex " + edge.From})
 			return
 		}
 	}
 
 	if edge.Family != "public" {
 		if edge.Family != "ownership" && edge.Family != "private" && edge.Family != "event" {
-			ErrorHandler(wr, rq, "Edge family not supported!")
+			ErrorHandler(wr, rq, APIResponse{Message: "Edge family not supported!"})
 			return
 		}
 		// its a well specified edge, no need for private key
 		// even if its ownership or private edges
 		// otherwise the private key needs to be confirmed
 		if (edge.Type == "" || edge.Name == "") && vkey == "" {
-			ErrorHandler(wr, rq, "Either private_key needs to be supplied or the edge type and name have to be known beforehand")
+			ErrorHandler(wr, rq, APIResponse{Message: "Either private_key needs to be supplied or the edge type and name have to be known beforehand"})
 			return
 		}
 	}
@@ -56,7 +56,7 @@ func GetEdges(wr http.ResponseWriter, rq *http.Request) {
 	edges, err := db.GetEdges(edge)
 
 	if err != nil {
-		ErrorHandler(wr, rq, err.Error())
+		ErrorHandler(wr, rq, APIResponse{Message: err.Error()})
 		return
 	}
 
@@ -67,9 +67,8 @@ func GetEdges(wr http.ResponseWriter, rq *http.Request) {
 		}
 	}
 
-	DataHandler(wr, rq, map[string]interface{}{
-		"success": true,
-		"edges":   edges,
+	DataHandler(wr, rq, APIResponse{
+		Edges: &edges,
 	})
 }
 
@@ -84,62 +83,61 @@ func CreateEdge(wr http.ResponseWriter, rq *http.Request) {
 
 	err := json.Unmarshal([]byte(ebd), edge)
 	if err != nil {
-		ErrorHandler(wr, rq, "Can't parse edge metadata:"+ebd)
+		ErrorHandler(wr, rq, APIResponse{Message: "Can't parse edge metadata:" + ebd})
 		return
 	}
 
 	if edge.Family != "private" && edge.Family != "public" {
-		ErrorHandler(wr, rq, "Invalid edge family. Only the following edge families are supported: private and public. ")
+		ErrorHandler(wr, rq, APIResponse{Message: "Invalid edge family. Only the following edge families are supported: private and public."})
 		return
 	}
 
 	if edge.From == "" || edge.To == "" {
-		ErrorHandler(wr, rq, fmt.Sprintf("Source vertex or destination id not supplied. %s -> %s", edge.From, edge.To))
+		ErrorHandler(wr, rq, APIResponse{Message: fmt.Sprintf("Source vertex or destination id not supplied. %s -> %s", edge.From, edge.To)})
 		return
 	}
 
 	if vkey != "" {
 		if !db.ConfirmVertexKey(edge.From, vkey) {
-			ErrorHandler(wr, rq, "Wrong source private key "+vkey+"supplied for vertex "+edge.From)
+			ErrorHandler(wr, rq, APIResponse{Message: "Wrong source private key " + vkey + "supplied for vertex " + edge.From})
 			return
 		}
 	} else {
 		if !db.ConfirmVertex(edge.From) {
-			ErrorHandler(wr, rq, "Source vertex not found.")
+			ErrorHandler(wr, rq, APIResponse{Message: "Source vertex not found."})
 			return
 		}
 	}
 
 	if !db.ConfirmVertex(edge.To) {
-		ErrorHandler(wr, rq, fmt.Sprintf("Destination vertex not found %s", edge.To))
+		ErrorHandler(wr, rq, APIResponse{Message: fmt.Sprintf("Destination vertex not found %s", edge.To)})
 		return
 	}
 
 	if edge.From == edge.To {
-		ErrorHandler(wr, rq, "Destination and source vertex are the same.")
+		ErrorHandler(wr, rq, APIResponse{Message: "Destination and source vertex are the same."})
 		return
 	}
 
 	if edge.Type == "" && edge.Name == "" {
-		ErrorHandler(wr, rq, "Both edge type and name missing.")
+		ErrorHandler(wr, rq, APIResponse{Message: "Both edge type and name missing."})
 		return
 	}
 
 	if edge.Family == "private" && edge.Name != "" && vkey == "" {
-		ErrorHandler(wr, rq, "Creating unique private edges requirs a private key")
+		ErrorHandler(wr, rq, APIResponse{Message: "Creating unique private edges requirs a private key"})
 		return
 	}
 
 	err = db.AddEdge(edge)
 	if err != nil {
-		ErrorHandler(wr, rq, err.Error())
+		ErrorHandler(wr, rq, APIResponse{Message: err.Error()})
 		return
 	}
 
 	fmt.Printf("Added a new edge successfully: %s -> %s (%s) \n", edge.From, edge.To, edge.Name)
 
-	DataHandler(wr, rq, map[string]interface{}{
-		"success": true,
-		"edge":    edge,
+	DataHandler(wr, rq, APIResponse{
+		Edge: edge,
 	})
 }
