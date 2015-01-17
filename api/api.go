@@ -80,7 +80,7 @@ func DataHandler(wr http.ResponseWriter, rq *http.Request, resp APIResponse) {
 	bd, err := json.Marshal(resp)
 
 	if err != nil {
-		ErrorHandler(wr, rq, err.Error())
+		ErrorHandler(wr, rq, APIResponse{Message: err.Error()})
 		return
 	}
 

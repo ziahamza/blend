@@ -1,24 +1,90 @@
 package db
 
-// HTTP API Backend
+import (
+	"encoding/json"
+	"errors"
+	"io/ioutil"
+	"net/http"
+	"net/url"
+	"os"
+	"path"
+)
 
+// HTTP API Backend
 type ProxyStorage struct {
-	uri string
+	url   *url.URL
+	cache Storage
 }
 
 func (db *ProxyStorage) Init(uri string) error {
+	var err error
+
+	db.url, err = url.Parse(uri)
+	if err != nil {
+		return err
+	}
+
+	// check if the graph api is working.
+	resp, err := http.Get(db.url.String())
+	if err != nil {
+		return err
+	}
+
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	var response struct {
+		GraphVersion string `json:"graph-version"`
+		Success      bool   `json:"success"`
+	}
+
+	err = json.Unmarshal(body, &response)
+	if err != nil {
+		return err
+	}
+
+	if !response.Success || response.GraphVersion != "" {
+		return errors.New("Cannot parse graph API for proxy backend")
+	}
+
+	db.cache = &BoltStorage{}
+
+	db.cache.Init(path.Join(os.TempDir(), "proxycache.db"))
+
 	return nil
 }
 
 func (db *ProxyStorage) Close() {
-
+	db.cache.Close()
 }
 
 func (db *ProxyStorage) Drop() error {
-	return nil
+	return db.cache.Drop()
 }
 
 func (db *ProxyStorage) GetVertex(v *Vertex, private bool) error {
+	err := db.cache.GetVertex(v, private)
+	if err == nil {
+		// vertex from cache found, return early
+		return nil
+	}
+	relURI, err := url.Parse("/vertex/" + v.Id)
+	if err != nil {
+		return err
+	}
+
+	if private {
+		q := url.Values{}
+		q.Set("private_key", v.PrivateKey)
+		relURI.RawQuery = q.Encode()
+	}
+
+	// resp, err := http.Get(db.url.ResolveReference(relURI).String())
+
 	return nil
 }
 
@@ -39,5 +105,9 @@ func (db *ProxyStorage) AddEdge(e *Edge) error {
 }
 
 func (db *ProxyStorage) DeleteVertex(v *Vertex) error {
+	return nil
+}
+
+func (db *ProxyStorage) DeleteVertexTree(vertices []*Vertex) error {
 	return nil
 }

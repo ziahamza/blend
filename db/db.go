@@ -69,6 +69,8 @@ type Storage interface {
 	UpdateVertex(*Vertex) error
 
 	DeleteVertex(*Vertex) error
+
+	DeleteVertexTree([]*Vertex) error
 }
 
 var backend Storage
@@ -87,7 +89,6 @@ func Drop() error {
 }
 
 func GetEdges(edge Edge) ([]Edge, error) {
-
 	return backend.GetEdges(edge)
 }
 
@@ -157,30 +158,7 @@ func DeleteVertex(vertex *Vertex) error {
 }
 
 func DeleteVertexTree(vertices []*Vertex) error {
-	if len(vertices) == 0 {
-		return nil
-	}
-
-	vertex := vertices[0]
-	vertices = vertices[1:]
-
-	backEdges, err := GetEdges(Edge{From: vertex.Id, Family: "ownership"})
-
-	if err != nil {
-		return err
-	}
-
-	// Breadth first deletion
-	for _, edge := range backEdges {
-		vertices = append(vertices, &Vertex{Id: edge.To})
-	}
-	err = DeleteVertexTree(vertices)
-
-	if err != nil {
-		return err
-	}
-
-	return backend.DeleteVertex(vertex)
+	return backend.DeleteVertexTree(vertices)
 }
 
 func AddVertexChild(vertex *Vertex, edge *Edge) error {

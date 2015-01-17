@@ -181,3 +181,30 @@ func (db *BoltStorage) DeleteVertex(v *Vertex) error {
 		return nil
 	})
 }
+
+func (backend *BoltStorage) DeleteVertexTree(vertices []*Vertex) error {
+	if len(vertices) == 0 {
+		return nil
+	}
+
+	vertex := vertices[0]
+	vertices = vertices[1:]
+
+	backEdges, err := backend.GetEdges(Edge{From: vertex.Id, Family: "ownership"})
+
+	if err != nil {
+		return err
+	}
+
+	// Breadth first deletion
+	for _, edge := range backEdges {
+		vertices = append(vertices, &Vertex{Id: edge.To})
+	}
+	err = backend.DeleteVertexTree(vertices)
+
+	if err != nil {
+		return err
+	}
+
+	return backend.DeleteVertex(vertex)
+}
