@@ -60,7 +60,8 @@ func (db *BoltStorage) Drop() error {
 	return db.Init(db.path)
 }
 
-func (db *BoltStorage) GetVertex(v *Vertex, private bool) error {
+func (db *BoltStorage) GetVertex(v *Vertex) error {
+	vkey := v.PrivateKey
 	return db.store.View(func(tx *bolt.Tx) error {
 		vertexBucket := tx.Bucket([]byte("vertex"))
 
@@ -69,7 +70,17 @@ func (db *BoltStorage) GetVertex(v *Vertex, private bool) error {
 			return errors.New("Vertex not found.")
 		}
 
-		return json.Unmarshal(vbytes, v)
+		err := json.Unmarshal(vbytes, v)
+		if err != nil {
+			return err
+		}
+		if vkey == "" {
+			v.PrivateKey = ""
+		} else if v.PrivateKey != vkey {
+			return errors.New("Wront private key supplied for vertex")
+		}
+
+		return nil
 	})
 }
 

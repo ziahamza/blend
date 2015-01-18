@@ -1,143 +1,140 @@
 package api
 
 import (
-	"encoding/json"
 	"fmt"
-	"net/http"
-
-	"github.com/gorilla/mux"
 
 	"github.com/ziahamza/blend/db"
 )
 
-func GetEdges(wr http.ResponseWriter, rq *http.Request) {
-	vars := mux.Vars(rq)
-
-	edge := db.Edge{
-		From:   vars["vertex_id"],
-		Family: rq.FormValue("edge_family"),
-		Type:   rq.FormValue("edge_type"),
-		Name:   rq.FormValue("edge_name"),
-	}
-
-	vkey := rq.FormValue("private_key")
-
-	if edge.Family == "" {
-		edge.Family = "public"
-	}
-
-	// confirm vertex data
-	if vkey == "" {
-		if !db.ConfirmVertex(edge.From) {
-			ErrorHandler(wr, rq, APIResponse{Message: "Vertex with the specific id not found:" + edge.From})
-			return
-		}
-	} else {
-		if !db.ConfirmVertexKey(edge.From, vkey) {
-			ErrorHandler(wr, rq, APIResponse{Message: "Wrong private key " + vkey + " supplied for source vertex " + edge.From})
-			return
+func GetEdges(v db.Vertex, e db.Edge) APIResponse {
+	if v.Id == "" {
+		return APIResponse{
+			Success: false,
+			Message: "Vertex ID not supplied",
 		}
 	}
 
-	if edge.Family != "public" {
-		if edge.Family != "ownership" && edge.Family != "private" && edge.Family != "event" {
-			ErrorHandler(wr, rq, APIResponse{Message: "Edge family not supported!"})
-			return
+	switch e.Family {
+	case "":
+		return APIResponse{
+			Success: false,
+			Message: "Edge family not supplied",
 		}
+	case "public", "private", "ownership":
+		// do nothing
+	default:
+		return APIResponse{
+			Success: false,
+			Message: "Unknown edge family given",
+		}
+
+	}
+
+	err := db.GetVertex(&v)
+	if err != nil {
+		return APIResponse{
+			Success: false,
+			Message: err.Error(),
+		}
+	}
+
+	if e.Family != "public" {
+
 		// its a well specified edge, no need for private key
 		// even if its ownership or private edges
 		// otherwise the private key needs to be confirmed
-		if (edge.Type == "" || edge.Name == "") && vkey == "" {
-			ErrorHandler(wr, rq, APIResponse{Message: "Either private_key needs to be supplied or the edge type and name have to be known beforehand"})
-			return
+		if (e.Type == "" || e.Name == "") && v.PrivateKey == "" {
+			return APIResponse{
+				Success: false,
+				Message: `Either private_key needs to be supplied or the
+					edge type and name have to be known beforehand`,
+			}
 		}
 	}
 
-	edges, err := db.GetEdges(edge)
+	edges, err := db.GetEdges(e)
 
 	if err != nil {
-		ErrorHandler(wr, rq, APIResponse{Message: err.Error()})
-		return
+		return APIResponse{Success: false, Message: err.Error()}
 	}
 
 	// remove edge data as private key was not supplied
-	if edge.Family != "public" && vkey == "" {
+	if e.Family != "public" && v.PrivateKey == "" {
 		for i := range edges {
 			edges[i].Data = ""
 		}
 	}
 
-	DataHandler(wr, rq, APIResponse{
-		Edges: &edges,
-	})
+	return APIResponse{
+		Success: true,
+		Edges:   &edges,
+	}
 }
 
-func CreateEdge(wr http.ResponseWriter, rq *http.Request) {
-	edge := &db.Edge{}
+func CreateEdge(sourceVertex, destVertex db.Vertex, e db.Edge) APIResponse {
+	var err error
 
-	// source private key
-	vkey := rq.FormValue("private_key")
-
-	// edge to add
-	ebd := rq.FormValue("edge")
-
-	err := json.Unmarshal([]byte(ebd), edge)
-	if err != nil {
-		ErrorHandler(wr, rq, APIResponse{Message: "Can't parse edge metadata:" + ebd})
-		return
+	switch e.Family {
+	case "":
+		return APIResponse{Success: false, Message: "Edge Family not given"}
+	case "private", "public":
+		// fall through
+	default:
+		return APIResponse{Success: false, Message: "Unknown edge famliy supplied"}
 	}
 
-	if edge.Family != "private" && edge.Family != "public" {
-		ErrorHandler(wr, rq, APIResponse{Message: "Invalid edge family. Only the following edge families are supported: private and public."})
-		return
-	}
-
-	if edge.From == "" || edge.To == "" {
-		ErrorHandler(wr, rq, APIResponse{Message: fmt.Sprintf("Source vertex or destination id not supplied. %s -> %s", edge.From, edge.To)})
-		return
-	}
-
-	if vkey != "" {
-		if !db.ConfirmVertexKey(edge.From, vkey) {
-			ErrorHandler(wr, rq, APIResponse{Message: "Wrong source private key " + vkey + "supplied for vertex " + edge.From})
-			return
-		}
-	} else {
-		if !db.ConfirmVertex(edge.From) {
-			ErrorHandler(wr, rq, APIResponse{Message: "Source vertex not found."})
-			return
+	if sourceVertex.Id == destVertex.Id {
+		return APIResponse{
+			Success: false,
+			Message: "Destination and source vertex are the same.",
 		}
 	}
 
-	if !db.ConfirmVertex(edge.To) {
-		ErrorHandler(wr, rq, APIResponse{Message: fmt.Sprintf("Destination vertex not found %s", edge.To)})
-		return
-	}
+	e.From = sourceVertex.Id
+	e.To = destVertex.Id
 
-	if edge.From == edge.To {
-		ErrorHandler(wr, rq, APIResponse{Message: "Destination and source vertex are the same."})
-		return
-	}
-
-	if edge.Type == "" && edge.Name == "" {
-		ErrorHandler(wr, rq, APIResponse{Message: "Both edge type and name missing."})
-		return
-	}
-
-	if edge.Family == "private" && edge.Name != "" && vkey == "" {
-		ErrorHandler(wr, rq, APIResponse{Message: "Creating unique private edges requirs a private key"})
-		return
-	}
-
-	err = db.AddEdge(edge)
+	err = db.GetVertex(&sourceVertex)
 	if err != nil {
-		ErrorHandler(wr, rq, APIResponse{Message: err.Error()})
-		return
+		return APIResponse{
+			Success: false,
+			Message: err.Error(),
+		}
 	}
 
-	fmt.Printf("Added a new edge successfully: %s -> %s (%s) \n", edge.From, edge.To, edge.Name)
+	err = db.GetVertex(&destVertex)
+	if err != nil {
+		return APIResponse{
+			Success: false,
+			Message: err.Error(),
+		}
+	}
 
-	DataHandler(wr, rq, APIResponse{
-		Edge: edge,
-	})
+	if e.Type == "" && e.Name == "" {
+		return APIResponse{
+			Success: false,
+			Message: "Both edge type and name missing.",
+		}
+	}
+
+	if e.Family == "private" && e.Name != "" && sourceVertex.PrivateKey == "" {
+		return APIResponse{
+			Success: false,
+			Message: "Creating unique private edges requirs a private key",
+		}
+	}
+
+	err = db.AddEdge(&e)
+	if err != nil {
+		return APIResponse{
+			Success: false,
+			Message: err.Error(),
+		}
+	}
+
+	fmt.Printf("Added a new edge successfully: %s -> %s (%s) \n", e.From, e.To, e.Name)
+
+	return APIResponse{
+		Success: true,
+		Edge:    &e,
+	}
 }

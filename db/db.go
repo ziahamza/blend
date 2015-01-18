@@ -12,8 +12,8 @@ type Vertex struct {
 	LastChanged time.Time `json:"last_changed"`
 	Name        string    `json:"vertex_name"`
 	Type        string    `json:"vertex_type"`
-	Private     string    `json:"private_data"`
-	PrivateKey  string    `json:"private_key"`
+	Private     string    `json:"private_data,omitempty"`
+	PrivateKey  string    `json:"private_key,omitempty"`
 	Public      string    `json:"public_data"`
 }
 
@@ -52,9 +52,10 @@ type Storage interface {
 	//		* a sane family is given to transverse the edges
 	GetEdges(Edge) ([]Edge, error)
 
-	// Fill in the details of the vertex by its Id. The second parameter dictates
-	// weather private details will be retrieved
-	GetVertex(*Vertex, bool) error
+	// Fill in the details of the vertex by its Id.
+	// The private details will only be available if the
+	// private key is passed.
+	GetVertex(*Vertex) error
 
 	// Add a specific edge to the DB. fills in the Edge pointer with the new ID
 	// of the edge
@@ -92,12 +93,12 @@ func GetEdges(edge Edge) ([]Edge, error) {
 	return backend.GetEdges(edge)
 }
 
-func GetVertex(vertex *Vertex, private bool) error {
+func GetVertex(vertex *Vertex) error {
 	if vertex.Id == "" {
 		return errors.New("Vertex Id not passed")
 	}
 
-	return backend.GetVertex(vertex, private)
+	return backend.GetVertex(vertex)
 }
 
 func UpdateVertex(vertex *Vertex) error {
@@ -204,25 +205,16 @@ func AddVertexChild(vertex *Vertex, edge *Edge) error {
 	return AddVertex(vertex)
 }
 
-func ConfirmVertex(vertex_id string) bool {
-	return backend.GetVertex(&Vertex{Id: vertex_id}, false) == nil
+func ConfirmVertex(vid string) bool {
+	return backend.GetVertex(&Vertex{Id: vid}) == nil
 }
 
-func ConfirmVertexKey(vertex_id, vertex_key string) bool {
-	vertex := &Vertex{Id: vertex_id}
-	err := backend.GetVertex(vertex, true)
+func ConfirmVertexKey(vid, vkey string) bool {
+	vertex := &Vertex{Id: vid, PrivateKey: vkey}
+	err := backend.GetVertex(vertex)
 	if err != nil {
 		return false
 	}
 
-	if vertex.Private == vertex_key {
-		return true
-	}
-
-	// Temporary HACK for testing
-	if vertex_key == "root" {
-		return true
-	}
-
-	return false
+	return true
 }

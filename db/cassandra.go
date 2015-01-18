@@ -1,6 +1,7 @@
 package db
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/gocql/gocql"
@@ -143,10 +144,10 @@ func (backend *CassandraStorage) UpdateVertex(vertex *Vertex) error {
 	return err
 }
 
-func (backend *CassandraStorage) GetVertex(vertex *Vertex, private bool) error {
-	var err error
-	if private {
-		err = backend.session.Query(
+func (backend *CassandraStorage) GetVertex(vertex *Vertex) error {
+	vkey := vertex.PrivateKey
+	if vkey != "" {
+		err := backend.session.Query(
 			`SELECT vertex_name, vertex_type, public_data, private_data, private_key
 			FROM vertices WHERE vertex_id = ? LIMIT 1;`,
 			vertex.Id,
@@ -154,19 +155,24 @@ func (backend *CassandraStorage) GetVertex(vertex *Vertex, private bool) error {
 			&vertex.Name, &vertex.Type,
 			&vertex.Public, &vertex.Private, &vertex.PrivateKey,
 		)
-	} else {
 
-		err = backend.session.Query(
-			`SELECT vertex_name, vertex_type, public_data
-			FROM vertices WHERE vertex_id = ? LIMIT 1;`,
-			vertex.Id,
-		).Consistency(gocql.One).Scan(
-			&vertex.Name, &vertex.Type,
-			&vertex.Public,
-		)
+		if err != nil {
+			return err
+		}
+
+		if vkey != vertex.PrivateKey {
+			return errors.New("Private Key Not Supplied")
+		}
 	}
 
-	return err
+	return backend.session.Query(
+		`SELECT vertex_name, vertex_type, public_data
+		FROM vertices WHERE vertex_id = ? LIMIT 1;`,
+		vertex.Id,
+	).Consistency(gocql.One).Scan(
+		&vertex.Name, &vertex.Type,
+		&vertex.Public,
+	)
 }
 
 func (backend *CassandraStorage) GetEdges(edge Edge) ([]Edge, error) {

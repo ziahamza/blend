@@ -66,8 +66,8 @@ func (db *ProxyStorage) Drop() error {
 	return db.cache.Drop()
 }
 
-func (db *ProxyStorage) GetVertex(v *Vertex, private bool) error {
-	err := db.cache.GetVertex(v, private)
+func (db *ProxyStorage) GetVertex(v *Vertex) error {
+	err := db.cache.GetVertex(v)
 	if err == nil {
 		// vertex from cache found, return early
 		return nil
@@ -77,7 +77,7 @@ func (db *ProxyStorage) GetVertex(v *Vertex, private bool) error {
 		return err
 	}
 
-	if private {
+	if v.PrivateKey != "" {
 		q := url.Values{}
 		q.Set("private_key", v.PrivateKey)
 		relURI.RawQuery = q.Encode()
