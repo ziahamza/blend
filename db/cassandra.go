@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ziahamza/blend"
+
 	"github.com/gocql/gocql"
 )
 
@@ -126,7 +128,7 @@ func (backend *CassandraStorage) Drop() error {
 	return nil
 }
 
-func (backend *CassandraStorage) UpdateVertex(vertex *Vertex) error {
+func (backend *CassandraStorage) UpdateVertex(vertex *blend.Vertex) error {
 	err := backend.session.Query(
 		`UPDATE vertices SET vertex_name = ?, vertex_type = ?, public_data = ?, private_data = ?
 		WHERE vertex_id = ? `,
@@ -144,7 +146,7 @@ func (backend *CassandraStorage) UpdateVertex(vertex *Vertex) error {
 	return err
 }
 
-func (backend *CassandraStorage) GetVertex(vertex *Vertex) error {
+func (backend *CassandraStorage) GetVertex(vertex *blend.Vertex) error {
 	vkey := vertex.PrivateKey
 	if vkey != "" {
 		err := backend.session.Query(
@@ -175,8 +177,8 @@ func (backend *CassandraStorage) GetVertex(vertex *Vertex) error {
 	)
 }
 
-func (backend *CassandraStorage) GetEdges(edge Edge) ([]Edge, error) {
-	edges := []Edge{}
+func (backend *CassandraStorage) GetEdges(edge blend.Edge) ([]blend.Edge, error) {
+	edges := []blend.Edge{}
 
 	var iter *gocql.Iter
 	if edge.Type == "" {
@@ -209,7 +211,7 @@ func (backend *CassandraStorage) GetEdges(edge Edge) ([]Edge, error) {
 	return edges, nil
 }
 
-func (backend *CassandraStorage) AddEdge(edge *Edge) error {
+func (backend *CassandraStorage) AddEdge(edge *blend.Edge) error {
 	err := backend.session.Query(
 		`SELECT to_vertex_id
 		FROM edges WHERE from_vertex_id = ? AND edge_family = ? AND edge_type = ? AND edge_name = ?;`,
@@ -243,7 +245,7 @@ func (backend *CassandraStorage) AddEdge(edge *Edge) error {
 	return nil
 }
 
-func (backend *CassandraStorage) AddVertex(vertex *Vertex) error {
+func (backend *CassandraStorage) AddVertex(vertex *blend.Vertex) error {
 	err := backend.session.Query(
 		`INSERT INTO vertices (
 			vertex_id, vertex_name, vertex_type, public_data, private_data, private_key
@@ -254,7 +256,7 @@ func (backend *CassandraStorage) AddVertex(vertex *Vertex) error {
 	return err
 }
 
-func (backend *CassandraStorage) DeleteVertex(vertex *Vertex) error {
+func (backend *CassandraStorage) DeleteVertex(vertex *blend.Vertex) error {
 	return backend.session.Query(
 		`BEGIN BATCH
 			DELETE FROM vertices WHERE vertex_id = ?
@@ -264,7 +266,7 @@ func (backend *CassandraStorage) DeleteVertex(vertex *Vertex) error {
 	).Consistency(gocql.Two).Exec()
 }
 
-func (backend *CassandraStorage) DeleteVertexTree(vertices []*Vertex) error {
+func (backend *CassandraStorage) DeleteVertexTree(vertices []*blend.Vertex) error {
 	if len(vertices) == 0 {
 		return nil
 	}
@@ -272,7 +274,7 @@ func (backend *CassandraStorage) DeleteVertexTree(vertices []*Vertex) error {
 	vertex := vertices[0]
 	vertices = vertices[1:]
 
-	backEdges, err := backend.GetEdges(Edge{From: vertex.Id, Family: "ownership"})
+	backEdges, err := backend.GetEdges(blend.Edge{From: vertex.Id, Family: "ownership"})
 
 	if err != nil {
 		return err
@@ -280,7 +282,7 @@ func (backend *CassandraStorage) DeleteVertexTree(vertices []*Vertex) error {
 
 	// Breadth first deletion
 	for _, edge := range backEdges {
-		vertices = append(vertices, &Vertex{Id: edge.To})
+		vertices = append(vertices, &blend.Vertex{Id: edge.To})
 	}
 	err = backend.DeleteVertexTree(vertices)
 

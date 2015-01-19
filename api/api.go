@@ -5,20 +5,28 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/ziahamza/blend/db"
-
 	"github.com/gorilla/mux"
+	"github.com/gorilla/websocket"
+
+	"github.com/ziahamza/blend"
 )
 
-// only a subset of the following fields are send as the response
-type APIResponse struct {
-	Success bool       `json:"success"`
-	Version string     `json:"graph-version"`
-	Message string     `json:"message,omitempty"`
-	Vertex  *db.Vertex `json:"vertex,omitempty"`
-	Edge    *db.Edge   `json:"edge,omitempty"`
-	Edges   *[]db.Edge `json:"edges,omitempty"`
-	// TODO: add type to send an entire graph
+func HandleRequest(req blend.APIRequest) blend.APIResponse {
+	switch req.Method {
+	case "vertex/get":
+		return GetVertex(req.Vertex)
+	case "vertex/new":
+		return CreateVertex(req.Vertex)
+	case "vertex/child":
+		return CreateChildVertex(req.Vertex, req.ChildVertex, req.Edge)
+
+	case "edge/get":
+		return GetEdges(req.Vertex, req.Edge)
+	case "edge/create":
+		return CreateEdge(req.Vertex, req.ChildVertex, req.Edge)
+	default:
+		return blend.APIResponse{Success: false, Message: "Unknown request method"}
+	}
 }
 
 func Handler() http.Handler {
@@ -26,7 +34,7 @@ func Handler() http.Handler {
 	router.Headers("Access-Control-Allow-Origin", "*")
 
 	router.HandleFunc("/", func(wr http.ResponseWriter, rq *http.Request) {
-		SendResponse(wr, APIResponse{
+		SendResponse(wr, blend.APIResponse{
 			Success: true,
 			Message: `
 				A distributed graph based filesystem for apps.
@@ -41,13 +49,26 @@ func Handler() http.Handler {
 
 	grouter := router.PathPrefix("/graph").Subrouter()
 
+	var upgrader = websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+	}
+
+	grouter.HandleFunc("/rpc", func(wr http.ResponseWriter, rq *http.Request) {
+		conn, err := upgrader.Upgrade(wr, rq, nil)
+		if err != nil {
+			fmt.Printf("Error with rpc: %s %v \n", err.Error(), conn)
+			return
+		}
+	})
+
 	// TODO: Hide the ability to create arbritary vertices as root nodes will be introduced soon.
 	grouter.HandleFunc("/vertex", func(wr http.ResponseWriter, rq *http.Request) {
-		var v db.Vertex
+		var v blend.Vertex
 		vbd := rq.FormValue("vertex")
 		err := json.Unmarshal([]byte(vbd), &v)
 		if err != nil {
-			SendResponse(wr, APIResponse{
+			SendResponse(wr, blend.APIResponse{
 				Success: false,
 				Message: "Can't parse vertex:" + vbd,
 			})
@@ -60,7 +81,7 @@ func Handler() http.Handler {
 
 	grouter.HandleFunc("/vertex/{vertex_id}", func(wr http.ResponseWriter, rq *http.Request) {
 		vars := mux.Vars(rq)
-		v := db.Vertex{Id: vars["vertex_id"], PrivateKey: rq.FormValue("private_key")}
+		v := blend.Vertex{Id: vars["vertex_id"], PrivateKey: rq.FormValue("private_key")}
 		SendResponse(wr, GetVertex(v))
 	}).Methods("GET")
 
@@ -68,9 +89,9 @@ func Handler() http.Handler {
 		vars := mux.Vars(rq)
 
 		var (
-			vertex      db.Vertex
-			childVertex db.Vertex
-			edge        db.Edge
+			vertex      blend.Vertex
+			childVertex blend.Vertex
+			edge        blend.Edge
 		)
 
 		vertex.Id = vars["vertex_id"]
@@ -79,7 +100,7 @@ func Handler() http.Handler {
 		vbd := rq.FormValue("vertex")
 		err := json.Unmarshal([]byte(vbd), &childVertex)
 		if err != nil {
-			SendResponse(wr, APIResponse{
+			SendResponse(wr, blend.APIResponse{
 				Success: false,
 				Message: "Can't parse vertex metadata:" + vbd,
 			})
@@ -90,7 +111,7 @@ func Handler() http.Handler {
 		ebd := rq.FormValue("edge")
 		err = json.Unmarshal([]byte(ebd), &edge)
 		if err != nil {
-			SendResponse(wr, APIResponse{
+			SendResponse(wr, blend.APIResponse{
 				Success: false,
 				Message: "Can't parse edge metadata:" + ebd,
 			})
@@ -101,51 +122,39 @@ func Handler() http.Handler {
 	}).Methods("POST")
 
 	grouter.HandleFunc("/edge", func(wr http.ResponseWriter, rq *http.Request) {
-		var e db.Edge
+		var e blend.Edge
 
 		// edge to add
 		ebd := rq.FormValue("edge")
 
 		err := json.Unmarshal([]byte(ebd), &e)
 		if err != nil {
-			SendResponse(wr, APIResponse{
+			SendResponse(wr, blend.APIResponse{
 				Success: false,
 				Message: "Can't parse edge metadata:" + ebd,
 			})
 			return
 		}
 
-		if e.From == "" || e.To == "" {
-			SendResponse(wr, APIResponse{
-				Success: false,
-				Message: fmt.Sprintf(
-					"Source vertex or destination id not supplied. %s -> %s",
-					e.From,
-					e.To),
-			})
-
-			return
-		}
-
-		sourceVertex := db.Vertex{
+		sourceVertex := blend.Vertex{
 			Id:         e.From,
 			PrivateKey: rq.FormValue("private_key"),
 		}
 
-		destVertex := db.Vertex{Id: e.To}
+		destVertex := blend.Vertex{Id: e.To}
 		SendResponse(wr, CreateEdge(sourceVertex, destVertex, e))
 	}).Methods("POST")
 
 	grouter.HandleFunc("/vertex/{vertex_id}/edges", func(wr http.ResponseWriter, rq *http.Request) {
 		vars := mux.Vars(rq)
-		edge := db.Edge{
+		edge := blend.Edge{
 			From:   vars["vertex_id"],
 			Family: rq.FormValue("edge_family"),
 			Type:   rq.FormValue("edge_type"),
 			Name:   rq.FormValue("edge_name"),
 		}
 
-		vertex := db.Vertex{
+		vertex := blend.Vertex{
 			Id:         vars["vertex_id"],
 			PrivateKey: rq.FormValue("private_key"),
 		}
@@ -164,7 +173,7 @@ func Handler() http.Handler {
 	return router
 }
 
-func SendResponse(wr http.ResponseWriter, resp APIResponse) {
+func SendResponse(wr http.ResponseWriter, resp blend.APIResponse) {
 	resp.Version = "0.0.1"
 
 	wr.Header().Set("Content-Type", "application/json")

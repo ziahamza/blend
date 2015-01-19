@@ -1,89 +1,49 @@
-package main
+package blend
 
 import (
-	"flag"
-	"fmt"
-	"log"
-	"net/http"
-	"os"
-	"path"
-
-	"github.com/ziahamza/blend/api"
-	"github.com/ziahamza/blend/db"
-	"github.com/ziahamza/blend/events"
+	"time"
 )
 
-func InitSchema() error {
-	rootVertex := &db.Vertex{
-		Id:         "root",
-		Name:       "root",
-		Type:       "root",
-		PrivateKey: "root",
-	}
-
-	err := db.AddVertex(rootVertex)
-	if err != nil {
-		return err
-	}
-
-	return nil
+type Vertex struct {
+	Id          string    `json:"vertex_id"`
+	LastChanged time.Time `json:"last_changed"`
+	Name        string    `json:"vertex_name"`
+	Type        string    `json:"vertex_type"`
+	Private     string    `json:"private_data,omitempty"`
+	PrivateKey  string    `json:"private_key,omitempty"`
+	Public      string    `json:"public_data"`
 }
 
-func main() {
-	backend := flag.String("backend", "local",
-		`Storage backend for the graph. Possible values include local, cassandra`)
+type Event struct {
+	Source  string    `json:"verted_id"`
+	Type    string    `json:"event_type"`
+	Created time.Time `json:"event_time"`
+}
 
-	uri := flag.String("uri", path.Join(os.TempDir(), "blend.db"),
-		`URI for the storage backend. IF the storage
-backend is cassandra then the URI will be the IP of a cassandra node.
-If the backend is local storage then the URI will be the path to the
-database file.`)
+// EDGE types: ownership, public, private and event
+type Edge struct {
+	LastChanged string `json:"last_changed"`
+	Family      string `json:"edge_family"`
+	Type        string `json:"edge_type"`
+	Name        string `json:"edge_name"`
+	From        string `json:"vertex_from"`
+	To          string `json:"vertex_to"`
+	Data        string `json:"edge_data"`
+}
+type APIRequest struct {
+	Method      string `json:"method,omitempty"`
+	Edge        Edge   `json:"edge,omitempty"`
+	Vertex      Vertex `json:"vertex,omitempty"`
+	ChildVertex Vertex `json:"child_vertex,omitempty"`
+}
 
-	listen := flag.String("port", ":8080", "Port and host for api server to listen on")
-	drop := flag.Bool("drop", false, "reset the backend storage schema")
-
-	flag.Parse()
-
-	var err error
-
-	if *backend == "local" {
-		err = db.Init(*uri, &db.BoltStorage{})
-	} else if *backend == "cassandra" {
-		err = db.Init(*uri, &db.CassandraStorage{})
-	} else {
-		log.Fatal("Backend not supported!")
-	}
-
-	if err != nil {
-		fmt.Printf("Cannot connect to the storage backend on %s \n", *uri)
-		fmt.Printf("Try passing a different URI for backend (%s) \n", err.Error())
-		return
-	}
-
-	defer db.Close()
-
-	err = InitSchema()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	events.Init()
-
-	if *drop {
-		err = db.Drop()
-		if err != nil {
-			log.Fatal("Failed to Drop DB tables and create a new schema: ", err)
-		}
-
-		fmt.Println("Recreated Blend Schema and Root Vertices successfully!")
-	}
-
-	http.Handle("/", api.Handler())
-
-	fmt.Printf("Blend Graph listening on host %s\n", *listen)
-	err = http.ListenAndServe(*listen, nil)
-
-	fmt.Printf("Server crash: %s\n", err.Error())
-
-	log.Fatal(err)
+// only a subset of the following fields are send as the response
+type APIResponse struct {
+	Success bool    `json:"success"`
+	Version string  `json:"graph-version"`
+	Message string  `json:"message,omitempty"`
+	Vertex  *Vertex `json:"vertex,omitempty"`
+	Edge    *Edge   `json:"edge,omitempty"`
+	Edges   *[]Edge `json:"edges,omitempty"`
+	// TODO: add type to send an entire graph
 }

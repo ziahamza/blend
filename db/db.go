@@ -2,37 +2,11 @@ package db
 
 import (
 	"errors"
-	"time"
+
+	"github.com/ziahamza/blend"
 
 	"github.com/nu7hatch/gouuid"
 )
-
-type Vertex struct {
-	Id          string    `json:"vertex_id"`
-	LastChanged time.Time `json:"last_changed"`
-	Name        string    `json:"vertex_name"`
-	Type        string    `json:"vertex_type"`
-	Private     string    `json:"private_data,omitempty"`
-	PrivateKey  string    `json:"private_key,omitempty"`
-	Public      string    `json:"public_data"`
-}
-
-type Event struct {
-	Source  string    `json:"verted_id"`
-	Type    string    `json:"event_type"`
-	Created time.Time `json:"event_time"`
-}
-
-// EDGE types: ownership, public, private and event
-type Edge struct {
-	LastChanged string `json:"last_changed"`
-	Family      string `json:"edge_family"`
-	Type        string `json:"edge_type"`
-	Name        string `json:"edge_name"`
-	From        string `json:"vertex_from"`
-	To          string `json:"vertex_to"`
-	Data        string `json:"edge_data"`
-}
 
 type Storage interface {
 	Init(string) error
@@ -50,28 +24,28 @@ type Storage interface {
 	// Assumes that:
 	//		* vertex with the specific ID exists
 	//		* a sane family is given to transverse the edges
-	GetEdges(Edge) ([]Edge, error)
+	GetEdges(blend.Edge) ([]blend.Edge, error)
 
 	// Fill in the details of the vertex by its Id.
 	// The private details will only be available if the
 	// private key is passed.
-	GetVertex(*Vertex) error
+	GetVertex(*blend.Vertex) error
 
 	// Add a specific edge to the DB. fills in the Edge pointer with the new ID
 	// of the edge
-	AddEdge(*Edge) error
+	AddEdge(*blend.Edge) error
 
 	// Adds a new vertex, only used to build root isolated vertices
-	AddVertex(*Vertex) error
+	AddVertex(*blend.Vertex) error
 
 	// Updates the details of a vertex. An entire vertex needs to be given as all
 	// details are updated at once. The update vertex automatically sets the private
 	// key from the original vertex, it is not overwridden.
-	UpdateVertex(*Vertex) error
+	UpdateVertex(*blend.Vertex) error
 
-	DeleteVertex(*Vertex) error
+	DeleteVertex(*blend.Vertex) error
 
-	DeleteVertexTree([]*Vertex) error
+	DeleteVertexTree([]*blend.Vertex) error
 }
 
 var backend Storage
@@ -89,11 +63,11 @@ func Drop() error {
 	return backend.Drop()
 }
 
-func GetEdges(edge Edge) ([]Edge, error) {
+func GetEdges(edge blend.Edge) ([]blend.Edge, error) {
 	return backend.GetEdges(edge)
 }
 
-func GetVertex(vertex *Vertex) error {
+func GetVertex(vertex *blend.Vertex) error {
 	if vertex.Id == "" {
 		return errors.New("Vertex Id not passed")
 	}
@@ -101,7 +75,7 @@ func GetVertex(vertex *Vertex) error {
 	return backend.GetVertex(vertex)
 }
 
-func UpdateVertex(vertex *Vertex) error {
+func UpdateVertex(vertex *blend.Vertex) error {
 	if vertex.Id == "" {
 		return errors.New("Vertex Id not passed")
 	}
@@ -109,7 +83,7 @@ func UpdateVertex(vertex *Vertex) error {
 	return backend.UpdateVertex(vertex)
 }
 
-func AddEdge(edge *Edge) error {
+func AddEdge(edge *blend.Edge) error {
 	if edge.Family != "ownership" && edge.Family != "private" &&
 		edge.Family != "public" && edge.Family != "event" {
 		return errors.New("Edge Family not supported")
@@ -126,11 +100,11 @@ func AddEdge(edge *Edge) error {
 	return nil
 }
 
-func PropogateChanges(vertex Vertex, event Event) error {
+func PropogateChanges(vertex blend.Vertex, event blend.Event) error {
 	return nil
 }
 
-func AddVertex(vertex *Vertex) error {
+func AddVertex(vertex *blend.Vertex) error {
 	if vertex.Id == "" {
 		vid, err := uuid.NewV4()
 
@@ -144,7 +118,7 @@ func AddVertex(vertex *Vertex) error {
 	err := backend.AddVertex(vertex)
 
 	if err == nil {
-		err = PropogateChanges(*vertex, Event{
+		err = PropogateChanges(*vertex, blend.Event{
 			Source:  vertex.Id,
 			Type:    "vertex:create",
 			Created: vertex.LastChanged,
@@ -154,15 +128,15 @@ func AddVertex(vertex *Vertex) error {
 	return err
 }
 
-func DeleteVertex(vertex *Vertex) error {
-	return DeleteVertexTree([]*Vertex{vertex})
+func DeleteVertex(vertex *blend.Vertex) error {
+	return DeleteVertexTree([]*blend.Vertex{vertex})
 }
 
-func DeleteVertexTree(vertices []*Vertex) error {
+func DeleteVertexTree(vertices []*blend.Vertex) error {
 	return backend.DeleteVertexTree(vertices)
 }
 
-func AddVertexChild(vertex *Vertex, edge *Edge) error {
+func AddVertexChild(vertex *blend.Vertex, edge *blend.Edge) error {
 	edge.Family = "ownership"
 
 	vid, err := uuid.NewV4()
@@ -206,11 +180,11 @@ func AddVertexChild(vertex *Vertex, edge *Edge) error {
 }
 
 func ConfirmVertex(vid string) bool {
-	return backend.GetVertex(&Vertex{Id: vid}) == nil
+	return backend.GetVertex(&blend.Vertex{Id: vid}) == nil
 }
 
 func ConfirmVertexKey(vid, vkey string) bool {
-	vertex := &Vertex{Id: vid, PrivateKey: vkey}
+	vertex := &blend.Vertex{Id: vid, PrivateKey: vkey}
 	err := backend.GetVertex(vertex)
 	if err != nil {
 		return false

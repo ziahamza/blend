@@ -3,18 +3,20 @@ package api
 import (
 	"fmt"
 
+	"github.com/ziahamza/blend"
+
 	"github.com/ziahamza/blend/db"
 )
 
 /*
 func ListenVertexEvents(wr http.ResponseWriter, rq *http.Request) {
 	vars := mux.Vars(rq)
-	vertex := &db.Vertex{Id: vars["vertex_id"]}
+	vertex := &blend.Vertex{Id: vars["vertex_id"]}
 
 	err := db.GetVertex(vertex, false)
 
 	if err != nil {
-		ErrorHandler(wr, rq, APIResponse{Message: err.Error()})
+		ErrorHandler(wr, rq, blend.APIResponse{Message: err.Error()})
 		return
 	}
 
@@ -25,34 +27,41 @@ func ListenVertexEvents(wr http.ResponseWriter, rq *http.Request) {
 }
 */
 
-func GetVertex(v db.Vertex) APIResponse {
+func GetVertex(v blend.Vertex) blend.APIResponse {
 	if v.Id == "" {
-		return APIResponse{Success: false, Message: "Vertex Id not supplied"}
+		return blend.APIResponse{Success: false, Message: "Vertex Id not supplied"}
 	}
 
 	err := db.GetVertex(&v)
 
 	if err != nil {
-		return APIResponse{Success: false, Message: err.Error()}
+		return blend.APIResponse{Success: false, Message: err.Error()}
 	}
 
-	return APIResponse{Success: true, Vertex: &v}
+	return blend.APIResponse{Success: true, Vertex: &v}
 }
 
-func CreateChildVertex(vertex db.Vertex, childVertex db.Vertex, e db.Edge) APIResponse {
+func CreateChildVertex(vertex blend.Vertex, childVertex blend.Vertex, e blend.Edge) blend.APIResponse {
+	if vertex.Id == "" {
+		return blend.APIResponse{
+			Success: false,
+			Message: "Vertex details empty",
+		}
+	}
+
 	e.From = vertex.Id
 	e.Family = "ownership"
 
 	err := db.GetVertex(&vertex)
 	if err != nil {
-		return APIResponse{
+		return blend.APIResponse{
 			Success: false,
 			Message: err.Error(),
 		}
 	}
 
 	if vertex.PrivateKey == "" && (e.Name == "" || e.Type == "") {
-		return APIResponse{
+		return blend.APIResponse{
 			Success: false,
 			Message: "Edge type and name cannot be empty if private key is not supplied",
 		}
@@ -62,7 +71,7 @@ func CreateChildVertex(vertex db.Vertex, childVertex db.Vertex, e db.Edge) APIRe
 
 	err = db.AddVertexChild(&childVertex, &e)
 	if err != nil {
-		return APIResponse{
+		return blend.APIResponse{
 			Success: false,
 			Message: err.Error(),
 		}
@@ -76,37 +85,37 @@ func CreateChildVertex(vertex db.Vertex, childVertex db.Vertex, e db.Edge) APIRe
 		childVertex.PrivateKey = ""
 	}
 
-	return APIResponse{
+	return blend.APIResponse{
 		Success: true,
 		Vertex:  &childVertex,
 		Edge:    &e,
 	}
 }
 
-func CreateVertex(v db.Vertex) APIResponse {
+func CreateVertex(v blend.Vertex) blend.APIResponse {
 	if v.Name == "" {
-		return APIResponse{
+		return blend.APIResponse{
 			Success: false,
 			Message: "Vertex name not specified ...",
 		}
 	}
 
 	if v.Type == "" {
-		return APIResponse{
+		return blend.APIResponse{
 			Success: false,
 			Message: "Vertex type not specified ...",
 		}
 	}
 
 	if v.Public == "" {
-		return APIResponse{
+		return blend.APIResponse{
 			Success: false,
 			Message: "Vertex type not specified ...",
 		}
 	}
 
 	if v.Private == "" {
-		return APIResponse{
+		return blend.APIResponse{
 			Success: false,
 			Message: "Vertex private data left empty ... ",
 		}
@@ -115,14 +124,14 @@ func CreateVertex(v db.Vertex) APIResponse {
 	err := db.AddVertex(&v)
 
 	if err != nil {
-		return APIResponse{
+		return blend.APIResponse{
 			Success: false,
 			Message: fmt.Sprintf("Cannot add a new vertex in the database (%s): ", err.Error()),
 		}
 	}
 
 	fmt.Printf("Added a new vertex successfully: %s \n", v.Id)
-	return APIResponse{
+	return blend.APIResponse{
 		Success: true,
 		Vertex:  &v,
 	}

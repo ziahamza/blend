@@ -1,13 +1,15 @@
 // boltdb backend
 package db
 
-import "github.com/boltdb/bolt"
-import "time"
-import "errors"
-import "encoding/json"
-import "bytes"
-
-import "os"
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"github.com/boltdb/bolt"
+	"github.com/ziahamza/blend"
+	"os"
+	"time"
+)
 
 type BoltStorage struct {
 	store *bolt.DB
@@ -60,7 +62,7 @@ func (db *BoltStorage) Drop() error {
 	return db.Init(db.path)
 }
 
-func (db *BoltStorage) GetVertex(v *Vertex) error {
+func (db *BoltStorage) GetVertex(v *blend.Vertex) error {
 	vkey := v.PrivateKey
 	return db.store.View(func(tx *bolt.Tx) error {
 		vertexBucket := tx.Bucket([]byte("vertex"))
@@ -84,8 +86,8 @@ func (db *BoltStorage) GetVertex(v *Vertex) error {
 	})
 }
 
-func (db *BoltStorage) GetEdges(e Edge) ([]Edge, error) {
-	edges := []Edge{}
+func (db *BoltStorage) GetEdges(e blend.Edge) ([]blend.Edge, error) {
+	edges := []blend.Edge{}
 
 	if len(e.Family) == 0 {
 		e.Family = "public"
@@ -109,7 +111,7 @@ func (db *BoltStorage) GetEdges(e Edge) ([]Edge, error) {
 		prefix := []byte(id)
 
 		for k, v := cursor.Seek(prefix); bytes.HasPrefix(k, prefix); k, v = cursor.Next() {
-			edge := Edge{}
+			edge := blend.Edge{}
 			json.Unmarshal(v, &edge)
 
 			edges = append(edges, edge)
@@ -121,7 +123,7 @@ func (db *BoltStorage) GetEdges(e Edge) ([]Edge, error) {
 	return edges, err
 }
 
-func (db *BoltStorage) AddVertex(v *Vertex) error {
+func (db *BoltStorage) AddVertex(v *blend.Vertex) error {
 	vbytes, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -135,7 +137,7 @@ func (db *BoltStorage) AddVertex(v *Vertex) error {
 	})
 }
 
-func (db *BoltStorage) UpdateVertex(v *Vertex) error {
+func (db *BoltStorage) UpdateVertex(v *blend.Vertex) error {
 	vbytes, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -148,8 +150,8 @@ func (db *BoltStorage) UpdateVertex(v *Vertex) error {
 	})
 }
 
-func (db *BoltStorage) AddEdge(e *Edge) error {
-	edges, err := GetEdges(Edge{
+func (db *BoltStorage) AddEdge(e *blend.Edge) error {
+	edges, err := GetEdges(blend.Edge{
 		From:   e.From,
 		Family: e.Family,
 		Name:   e.Name,
@@ -183,7 +185,7 @@ func (db *BoltStorage) AddEdge(e *Edge) error {
 	})
 }
 
-func (db *BoltStorage) DeleteVertex(v *Vertex) error {
+func (db *BoltStorage) DeleteVertex(v *blend.Vertex) error {
 	return db.store.Update(func(tx *bolt.Tx) error {
 		vertexBucket := tx.Bucket([]byte("vertex"))
 
@@ -193,7 +195,7 @@ func (db *BoltStorage) DeleteVertex(v *Vertex) error {
 	})
 }
 
-func (backend *BoltStorage) DeleteVertexTree(vertices []*Vertex) error {
+func (backend *BoltStorage) DeleteVertexTree(vertices []*blend.Vertex) error {
 	if len(vertices) == 0 {
 		return nil
 	}
@@ -201,7 +203,7 @@ func (backend *BoltStorage) DeleteVertexTree(vertices []*Vertex) error {
 	vertex := vertices[0]
 	vertices = vertices[1:]
 
-	backEdges, err := backend.GetEdges(Edge{From: vertex.Id, Family: "ownership"})
+	backEdges, err := backend.GetEdges(blend.Edge{From: vertex.Id, Family: "ownership"})
 
 	if err != nil {
 		return err
@@ -209,7 +211,7 @@ func (backend *BoltStorage) DeleteVertexTree(vertices []*Vertex) error {
 
 	// Breadth first deletion
 	for _, edge := range backEdges {
-		vertices = append(vertices, &Vertex{Id: edge.To})
+		vertices = append(vertices, &blend.Vertex{Id: edge.To})
 	}
 	err = backend.DeleteVertexTree(vertices)
 

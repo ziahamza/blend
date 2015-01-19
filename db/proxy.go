@@ -8,6 +8,8 @@ import (
 	"net/url"
 	"os"
 	"path"
+
+	"github.com/ziahamza/blend"
 )
 
 // HTTP API Backend
@@ -66,7 +68,14 @@ func (db *ProxyStorage) Drop() error {
 	return db.cache.Drop()
 }
 
-func (db *ProxyStorage) GetVertex(v *Vertex) error {
+/*
+func (db *ProxyStorage) getAPIResponse() api.APIResponse {
+
+	return api.APIResponse{}
+}
+*/
+
+func (db *ProxyStorage) GetVertex(v *blend.Vertex) error {
 	err := db.cache.GetVertex(v)
 	if err == nil {
 		// vertex from cache found, return early
@@ -88,26 +97,26 @@ func (db *ProxyStorage) GetVertex(v *Vertex) error {
 	return nil
 }
 
-func (db *ProxyStorage) GetEdges(e Edge) ([]Edge, error) {
+func (db *ProxyStorage) GetEdges(e blend.Edge) ([]blend.Edge, error) {
 	return nil, nil
 }
 
-func (db *ProxyStorage) AddVertex(v *Vertex) error {
+func (db *ProxyStorage) AddVertex(v *blend.Vertex) error {
 	return nil
 }
 
-func (db *ProxyStorage) UpdateVertex(v *Vertex) error {
+func (db *ProxyStorage) UpdateVertex(v *blend.Vertex) error {
 	return nil
 }
 
-func (db *ProxyStorage) AddEdge(e *Edge) error {
+func (db *ProxyStorage) AddEdge(e *blend.Edge) error {
 	return nil
 }
 
-func (db *ProxyStorage) DeleteVertex(v *Vertex) error {
+func (db *ProxyStorage) DeleteVertex(v *blend.Vertex) error {
 	return nil
 }
 
-func (db *ProxyStorage) DeleteVertexTree(vertices []*Vertex) error {
+func (db *ProxyStorage) DeleteVertexTree(vertices []*blend.Vertex) error {
 	return nil
 }

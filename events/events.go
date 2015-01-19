@@ -1,13 +1,13 @@
 package events
 
 import (
-	"github.com/ziahamza/blend/db"
+	"github.com/ziahamza/blend"
 	"sync"
 	"sync/atomic"
 )
 
 type VertexListener struct {
-	events chan db.Event
+	events chan blend.Event
 
 	// number of listeners listening on the events channel
 	count int32
@@ -65,7 +65,7 @@ func setVertexListener(id string, listener *VertexListener) *VertexListener {
 	return listener
 }
 
-func Dispatch(id string, event db.Event) {
+func Dispatch(id string, event blend.Event) {
 	listener := getVertexListener(id)
 
 	if listener != nil && atomic.LoadInt32(&listener.count) > 0 {
@@ -73,7 +73,7 @@ func Dispatch(id string, event db.Event) {
 	}
 }
 
-func Subscribe(id string) chan db.Event {
+func Subscribe(id string) chan blend.Event {
 	listener := getVertexListener(id)
 
 	if listener == nil {

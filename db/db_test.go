@@ -4,7 +4,7 @@ import "testing"
 
 func testVertexTree(t *testing.T) {
 
-	vertex := &Vertex{
+	vertex := &blend.Vertex{
 		Name:       "TestRoot",
 		Type:       "test",
 		Public:     "Sample data ... ",
@@ -23,7 +23,7 @@ func testVertexTree(t *testing.T) {
 		return
 	}
 
-	childVertex := &Vertex{
+	childVertex := &blend.Vertex{
 		Name:       "TestChild",
 		Type:       "test",
 		Public:     "Sample data ... ",
@@ -31,7 +31,7 @@ func testVertexTree(t *testing.T) {
 		PrivateKey: "test key",
 	}
 
-	childEdge := &Edge{
+	childEdge := &blend.Edge{
 		Type: "child",
 		Name: "testedge",
 		From: vertex.Id,
@@ -48,7 +48,7 @@ func testVertexTree(t *testing.T) {
 		return
 	}
 
-	edges, err := GetEdges(Edge{From: vertex.Id, Family: "ownership"})
+	edges, err := GetEdges(blend.Edge{From: vertex.Id, Family: "ownership"})
 	if err != nil {
 		t.Error(err.Error())
 		return
@@ -103,7 +103,7 @@ func TestBolt(t *testing.T) {
 }
 
 func testAddDel(t *testing.T) {
-	vertex := &Vertex{
+	vertex := &blend.Vertex{
 		Name:       "TestAdd",
 		Type:       "test",
 		Public:     "Sample data ... ",
