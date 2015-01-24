@@ -68,12 +68,10 @@ func (db *ProxyStorage) Drop() error {
 	return db.cache.Drop()
 }
 
-/*
-func (db *ProxyStorage) getAPIResponse() api.APIResponse {
+func (db *ProxyStorage) GetAPIResponse(req blend.APIRequest) blend.APIResponse {
 
-	return api.APIResponse{}
+	return blend.APIResponse{}
 }
-*/
 
 func (db *ProxyStorage) GetVertex(v *blend.Vertex) error {
 	err := db.cache.GetVertex(v)

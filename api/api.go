@@ -15,9 +15,9 @@ func HandleRequest(req blend.APIRequest) blend.APIResponse {
 	switch req.Method {
 	case "vertex/get":
 		return GetVertex(req.Vertex)
-	case "vertex/new":
+	case "vertex/create":
 		return CreateVertex(req.Vertex)
-	case "vertex/child":
+	case "vertex/createChild":
 		return CreateChildVertex(req.Vertex, req.ChildVertex, req.Edge)
 
 	case "edge/get":
@@ -52,13 +52,36 @@ func Handler() http.Handler {
 	var upgrader = websocket.Upgrader{
 		ReadBufferSize:  1024,
 		WriteBufferSize: 1024,
+		CheckOrigin:     func(r *http.Request) bool { return true },
 	}
 
 	grouter.HandleFunc("/rpc", func(wr http.ResponseWriter, rq *http.Request) {
 		conn, err := upgrader.Upgrade(wr, rq, nil)
 		if err != nil {
-			fmt.Printf("Error with rpc: %s %v \n", err.Error(), conn)
+			fmt.Printf("Error with rpc: %s %v \n", err.Error())
 			return
+		}
+
+		for {
+			var (
+				req  blend.APIRequest
+				resp blend.APIResponse
+			)
+			err = conn.ReadJSON(&req)
+
+			if err != nil {
+				resp = blend.APIResponse{
+					Success: false,
+					Message: "Error Parsing api request" + err.Error(),
+				}
+			} else {
+				resp = HandleRequest(req)
+			}
+
+			err = conn.WriteJSON(&resp)
+			if err != nil {
+				break
+			}
 		}
 	})
 
