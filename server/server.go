@@ -22,7 +22,7 @@ func InitSchema() error {
 		PrivateKey: "root",
 	}
 
-	err := db.AddVertex(rootVertex)
+	err := db.CreateVertex(rootVertex)
 	if err != nil {
 		return err
 	}
@@ -32,13 +32,13 @@ func InitSchema() error {
 
 func main() {
 	backend := flag.String("backend", "local",
-		`Storage backend for the graph. Possible values include local, cassandra`)
+		`Storage backend for the graph. Possible values include local, proxy and cassandra`)
 
 	uri := flag.String("uri", path.Join(os.TempDir(), "blend.db"),
 		`URI for the storage backend. IF the storage
 backend is cassandra then the URI will be the IP of a cassandra node.
 If the backend is local storage then the URI will be the path to the
-database file.`)
+database file. If the backend is proxy then URI is the graph URL`)
 
 	listen := flag.String("port", ":8080", "Port and host for api server to listen on")
 	drop := flag.Bool("drop", false, "reset the backend storage schema")
@@ -51,6 +51,8 @@ database file.`)
 		err = db.Init(*uri, &db.BoltStorage{})
 	} else if *backend == "cassandra" {
 		err = db.Init(*uri, &db.CassandraStorage{})
+	} else if *backend == "proxy" {
+		err = db.Init(*uri, &db.ProxyStorage{})
 	} else {
 		log.Fatal("Backend not supported!")
 	}

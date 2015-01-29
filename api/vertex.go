@@ -69,7 +69,7 @@ func CreateChildVertex(vertex blend.Vertex, childVertex blend.Vertex, e blend.Ed
 
 	fmt.Printf("Creating the child vertex under %s \n", vertex.Id)
 
-	err = db.AddVertexChild(&childVertex, &e)
+	err = db.CreateChildVertex(&vertex, &childVertex, e)
 	if err != nil {
 		return blend.APIResponse{
 			Success: false,
@@ -121,7 +121,7 @@ func CreateVertex(v blend.Vertex) blend.APIResponse {
 		}
 	}
 
-	err := db.AddVertex(&v)
+	err := db.CreateVertex(&v)
 
 	if err != nil {
 		return blend.APIResponse{

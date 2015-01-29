@@ -1,6 +1,9 @@
 package db
 
-import "testing"
+import (
+	"github.com/ziahamza/blend"
+	"testing"
+)
 
 func testVertexTree(t *testing.T) {
 
@@ -12,7 +15,7 @@ func testVertexTree(t *testing.T) {
 		PrivateKey: "test key",
 	}
 
-	err := AddVertex(vertex)
+	err := CreateVertex(vertex)
 	if err != nil {
 		t.Error(err.Error())
 		return
@@ -38,17 +41,17 @@ func testVertexTree(t *testing.T) {
 		Data: "test data",
 	}
 
-	err = AddVertexChild(childVertex, childEdge)
+	err = CreateChildVertex(vertex, childVertex, *childEdge)
 	if err != nil {
 		t.Error(err.Error())
 	}
 
 	if ConfirmVertex(childVertex.Id) == false {
-		t.Error("Vertex couold not be confirmed after adding to the db")
+		t.Error("Vertex couold not be confirmed after adding to the db:" + childVertex.Id)
 		return
 	}
 
-	edges, err := GetEdges(blend.Edge{From: vertex.Id, Family: "ownership"})
+	edges, err := GetEdges(*vertex, blend.Edge{From: vertex.Id, Family: "ownership"})
 	if err != nil {
 		t.Error(err.Error())
 		return
@@ -76,19 +79,6 @@ func testVertexTree(t *testing.T) {
 	}
 }
 
-func TestMemory(t *testing.T) {
-	err := Init("", &MemoryStorage{})
-	if err != nil {
-		t.Error(err.Error())
-		return
-	}
-
-	defer Close()
-
-	testVertexTree(t)
-	testAddDel(t)
-}
-
 func TestBolt(t *testing.T) {
 	err := Init("./test.bolt.db", &BoltStorage{})
 	if err != nil {
@@ -111,7 +101,7 @@ func testAddDel(t *testing.T) {
 		PrivateKey: "test key",
 	}
 
-	err := AddVertex(vertex)
+	err := CreateVertex(vertex)
 	if err != nil {
 		t.Error(err.Error())
 		return

@@ -76,6 +76,7 @@ func (db *BoltStorage) GetVertex(v *blend.Vertex) error {
 		if err != nil {
 			return err
 		}
+
 		if vkey == "" {
 			v.PrivateKey = ""
 		} else if v.PrivateKey != vkey {
@@ -86,7 +87,7 @@ func (db *BoltStorage) GetVertex(v *blend.Vertex) error {
 	})
 }
 
-func (db *BoltStorage) GetEdges(e blend.Edge) ([]blend.Edge, error) {
+func (db *BoltStorage) GetEdges(v blend.Vertex, e blend.Edge) ([]blend.Edge, error) {
 	edges := []blend.Edge{}
 
 	if len(e.Family) == 0 {
@@ -99,7 +100,7 @@ func (db *BoltStorage) GetEdges(e blend.Edge) ([]blend.Edge, error) {
 		// format for edge key:
 		// vertexFromId:family:type:name
 
-		id := e.From + ":" + e.Family
+		id := v.Id + ":" + e.Family
 		if e.Type != "" {
 			id += ":" + e.Type
 
@@ -123,13 +124,64 @@ func (db *BoltStorage) GetEdges(e blend.Edge) ([]blend.Edge, error) {
 	return edges, err
 }
 
-func (db *BoltStorage) AddVertex(v *blend.Vertex) error {
+func (backend *BoltStorage) GetChildVertex(v blend.Vertex, e blend.Edge) (blend.Vertex, error) {
+	vertex := blend.Vertex{}
+	edges, err := backend.GetEdges(v, e)
+
+	if err != nil {
+		return vertex, err
+	}
+
+	if len(edges) == 0 {
+		return vertex, errors.New("Child Vertex not found!")
+	}
+
+	vertex.Id = edges[0].To
+	err = GetVertex(&vertex)
+
+	return vertex, err
+}
+
+func (backend *BoltStorage) CreateChildVertex(v, vc *blend.Vertex, e blend.Edge) error {
+	e.Family = "ownership"
+
+	vertex, err := backend.GetChildVertex(*v, e)
+
+	if err == nil {
+		vc.Id = vertex.Id
+		return UpdateVertex(vc)
+	}
+
 	vbytes, err := json.Marshal(v)
 	if err != nil {
 		return err
 	}
 
-	return db.store.Update(func(tx *bolt.Tx) error {
+	ebytes, err := json.Marshal(e)
+	if err != nil {
+		return err
+	}
+
+	return backend.store.Update(func(tx *bolt.Tx) error {
+		vertexBucket := tx.Bucket([]byte("vertex"))
+		edgeBucket := tx.Bucket([]byte("edge"))
+
+		vertexBucket.Put([]byte(v.Id), vbytes)
+
+		edgeId := e.From + ":" + e.Family + ":" + e.Type + ":" + e.Name
+		edgeBucket.Put([]byte(edgeId), ebytes)
+
+		return nil
+	})
+}
+
+func (backend *BoltStorage) CreateVertex(v *blend.Vertex) error {
+	vbytes, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	return backend.store.Update(func(tx *bolt.Tx) error {
 		vertexBucket := tx.Bucket([]byte("vertex"))
 		vertexBucket.Put([]byte(v.Id), vbytes)
 
@@ -137,22 +189,21 @@ func (db *BoltStorage) AddVertex(v *blend.Vertex) error {
 	})
 }
 
-func (db *BoltStorage) UpdateVertex(v *blend.Vertex) error {
+func (backend *BoltStorage) UpdateVertex(v *blend.Vertex) error {
 	vbytes, err := json.Marshal(v)
 	if err != nil {
 		return err
 	}
 
-	return db.store.Update(func(tx *bolt.Tx) error {
+	return backend.store.Update(func(tx *bolt.Tx) error {
 		vertexBucket := tx.Bucket([]byte("vertex"))
 		vertexBucket.Put([]byte(v.Id), vbytes)
 		return nil
 	})
 }
 
-func (db *BoltStorage) AddEdge(e *blend.Edge) error {
-	edges, err := GetEdges(blend.Edge{
-		From:   e.From,
+func (backend *BoltStorage) CreateEdge(v blend.Vertex, e *blend.Edge) error {
+	edges, err := GetEdges(v, blend.Edge{
 		Family: e.Family,
 		Name:   e.Name,
 		Type:   e.Type,
@@ -170,7 +221,7 @@ func (db *BoltStorage) AddEdge(e *blend.Edge) error {
 		return err
 	}
 
-	return db.store.Update(func(tx *bolt.Tx) error {
+	return backend.store.Update(func(tx *bolt.Tx) error {
 		edgeBucket := tx.Bucket([]byte("edge"))
 		vertexBucket := tx.Bucket([]byte("vertex"))
 
@@ -185,9 +236,11 @@ func (db *BoltStorage) AddEdge(e *blend.Edge) error {
 	})
 }
 
-func (db *BoltStorage) DeleteVertex(v *blend.Vertex) error {
-	return db.store.Update(func(tx *bolt.Tx) error {
+func (backend *BoltStorage) DeleteVertex(v *blend.Vertex) error {
+	return backend.store.Update(func(tx *bolt.Tx) error {
 		vertexBucket := tx.Bucket([]byte("vertex"))
+
+		// TODO: Delete corresponding edges ...
 
 		vertexBucket.Delete([]byte(v.Id))
 
@@ -203,7 +256,7 @@ func (backend *BoltStorage) DeleteVertexTree(vertices []*blend.Vertex) error {
 	vertex := vertices[0]
 	vertices = vertices[1:]
 
-	backEdges, err := backend.GetEdges(blend.Edge{From: vertex.Id, Family: "ownership"})
+	backEdges, err := backend.GetEdges(*vertex, blend.Edge{Family: "ownership"})
 
 	if err != nil {
 		return err

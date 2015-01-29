@@ -1,56 +1,37 @@
 package db
 
 import (
-	"encoding/json"
 	"errors"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
 	"path"
 
+	"github.com/gorilla/websocket"
 	"github.com/ziahamza/blend"
 )
 
 // HTTP API Backend
 type ProxyStorage struct {
-	url   *url.URL
-	cache Storage
+	rpcURL *url.URL
+	cache  Storage
 }
 
 func (db *ProxyStorage) Init(uri string) error {
 	var err error
 
-	db.url, err = url.Parse(uri)
+	db.rpcURL, err = url.Parse(uri)
 	if err != nil {
 		return err
 	}
 
-	// check if the graph api is working.
-	resp, err := http.Get(db.url.String())
+	resp, err := db.GetAPIResponse(blend.APIRequest{Method: "/"})
 	if err != nil {
 		return err
 	}
 
-	defer resp.Body.Close()
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-
-	var response struct {
-		GraphVersion string `json:"graph-version"`
-		Success      bool   `json:"success"`
-	}
-
-	err = json.Unmarshal(body, &response)
-	if err != nil {
-		return err
-	}
-
-	if !response.Success || response.GraphVersion != "" {
-		return errors.New("Cannot parse graph API for proxy backend")
+	if !resp.Success {
+		return errors.New("Cannot parse graph API for proxy backend:" + resp.Message)
 	}
 
 	db.cache = &BoltStorage{}
@@ -68,38 +49,82 @@ func (db *ProxyStorage) Drop() error {
 	return db.cache.Drop()
 }
 
-func (db *ProxyStorage) GetAPIResponse(req blend.APIRequest) blend.APIResponse {
+func (db *ProxyStorage) GetAPIResponse(req blend.APIRequest) (blend.APIResponse, error) {
+	var resp blend.APIResponse
+	conn, _, err := websocket.DefaultDialer.Dial(db.rpcURL.String(), http.Header{})
+	if err != nil {
+		return resp, err
+	}
 
-	return blend.APIResponse{}
+	defer conn.Close()
+
+	err = conn.WriteJSON(&req)
+	if err != nil {
+		return resp, err
+	}
+
+	err = conn.ReadJSON(&resp)
+	if err != nil {
+		return resp, err
+	}
+
+	return resp, nil
 }
 
 func (db *ProxyStorage) GetVertex(v *blend.Vertex) error {
-	err := db.cache.GetVertex(v)
-	if err == nil {
-		// vertex from cache found, return early
-		return nil
-	}
-	relURI, err := url.Parse("/vertex/" + v.Id)
+	/*
+		err := db.cache.GetVertex(v)
+		if err == nil {
+			// vertex from cache found, return early
+			return nil
+		}
+	*/
+
+	resp, err := db.GetAPIResponse(blend.APIRequest{
+		Method: "/vertex/get",
+		Vertex: *v,
+	})
+
 	if err != nil {
 		return err
 	}
 
-	if v.PrivateKey != "" {
-		q := url.Values{}
-		q.Set("private_key", v.PrivateKey)
-		relURI.RawQuery = q.Encode()
+	if resp.Success == false {
+		return errors.New(resp.Message)
 	}
 
-	// resp, err := http.Get(db.url.ResolveReference(relURI).String())
+	*v = *resp.Vertex
 
 	return nil
 }
 
-func (db *ProxyStorage) GetEdges(e blend.Edge) ([]blend.Edge, error) {
+func (db *ProxyStorage) GetEdges(v blend.Vertex, e blend.Edge) ([]blend.Edge, error) {
+	resp, err := db.GetAPIResponse(blend.APIRequest{
+		Method: "/edge/get",
+		Vertex: v,
+		Edge:   e,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.Success == false {
+		return nil, errors.New(resp.Message)
+	}
+
 	return nil, nil
 }
 
-func (db *ProxyStorage) AddVertex(v *blend.Vertex) error {
+func (db *ProxyStorage) GetChildVertex(v blend.Vertex, e blend.Edge) (blend.Vertex, error) {
+	return blend.Vertex{}, nil
+}
+
+func (db *ProxyStorage) CreateChildVertex(v, vc *blend.Vertex, e blend.Edge) error {
+	return nil
+}
+
+func (db *ProxyStorage) CreateVertex(v *blend.Vertex) error {
 	return nil
 }
 
@@ -107,7 +132,7 @@ func (db *ProxyStorage) UpdateVertex(v *blend.Vertex) error {
 	return nil
 }
 
-func (db *ProxyStorage) AddEdge(e *blend.Edge) error {
+func (db *ProxyStorage) CreateEdge(v blend.Vertex, e *blend.Edge) error {
 	return nil
 }
 

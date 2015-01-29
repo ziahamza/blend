@@ -13,19 +13,31 @@ import (
 
 func HandleRequest(req blend.APIRequest) blend.APIResponse {
 	switch req.Method {
-	case "vertex/get":
+	case "/":
+		return GetInfo()
+	case "/vertex/get":
 		return GetVertex(req.Vertex)
-	case "vertex/create":
+	case "/vertex/create":
 		return CreateVertex(req.Vertex)
-	case "vertex/createChild":
+	case "/vertex/createChild":
 		return CreateChildVertex(req.Vertex, req.ChildVertex, req.Edge)
 
-	case "edge/get":
+	case "/edge/get":
 		return GetEdges(req.Vertex, req.Edge)
-	case "edge/create":
+	case "/edge/create":
 		return CreateEdge(req.Vertex, req.ChildVertex, req.Edge)
 	default:
 		return blend.APIResponse{Success: false, Message: "Unknown request method"}
+	}
+}
+
+func GetInfo() blend.APIResponse {
+	return blend.APIResponse{
+		Success: true,
+		Message: `
+			A distributed graph based filesystem for apps.
+			Head over to /graph/help for api usage
+		`,
 	}
 }
 
@@ -34,13 +46,7 @@ func Handler() http.Handler {
 	router.Headers("Access-Control-Allow-Origin", "*")
 
 	router.HandleFunc("/", func(wr http.ResponseWriter, rq *http.Request) {
-		SendResponse(wr, blend.APIResponse{
-			Success: true,
-			Message: `
-				A distributed graph based filesystem for apps.
-				Head over to /graph/help for api usage
-			`,
-		})
+		SendResponse(wr, GetInfo())
 	})
 
 	router.HandleFunc("/help", func(wr http.ResponseWriter, rq *http.Request) {

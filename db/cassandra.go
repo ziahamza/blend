@@ -177,75 +177,118 @@ func (backend *CassandraStorage) GetVertex(vertex *blend.Vertex) error {
 	)
 }
 
-func (backend *CassandraStorage) GetEdges(edge blend.Edge) ([]blend.Edge, error) {
+func (backend *CassandraStorage) GetEdges(v blend.Vertex, e blend.Edge) ([]blend.Edge, error) {
 	edges := []blend.Edge{}
 
 	var iter *gocql.Iter
-	if edge.Type == "" {
+	if e.Type == "" {
 		// get all edges by a specific family
 		iter = backend.session.Query(
 			`SELECT edge_name, edge_type, edge_family, to_vertex_id, edge_data
 			FROM edges WHERE from_vertex_id = ? AND edge_family = ?;`,
-			edge.From, edge.Family,
+			v.Id, e.Family,
 		).Consistency(gocql.One).Iter()
-	} else if edge.Name == "" {
+	} else if e.Name == "" {
 		// get all edges by a specific family and a specific type
 		iter = backend.session.Query(
 			`SELECT edge_name, edge_type, edge_family, to_vertex_id, edge_data
 			FROM edges WHERE from_vertex_id = ? AND edge_family = ? AND edge_type = ?;`,
-			edge.From, edge.Family, edge.Type,
+			v.Id, e.Family, e.Type,
 		).Consistency(gocql.One).Iter()
 	} else {
 		// get all edges by a specific family, type and name
 		iter = backend.session.Query(
 			`SELECT edge_name, edge_type, edge_family, to_vertex_id, edge_data
 			FROM edges WHERE from_vertex_id = ? AND edge_family = ? AND edge_type = ? AND edge_name = ?;`,
-			edge.From, edge.Family, edge.Type, edge.Name,
+			v.Id, e.Family, e.Type, e.Name,
 		).Consistency(gocql.One).Iter()
 	}
 
-	for iter.Scan(&edge.Name, &edge.Type, &edge.Family, &edge.To, &edge.Data) {
-		edges = append(edges, edge)
+	for iter.Scan(&e.Name, &e.Type, &e.Family, &e.To, &e.Data) {
+		edges = append(edges, e)
 	}
 
 	return edges, nil
 }
 
-func (backend *CassandraStorage) AddEdge(edge *blend.Edge) error {
+func (backend *CassandraStorage) GetChildVertex(v blend.Vertex, e blend.Edge) (blend.Vertex, error) {
+
 	err := backend.session.Query(
 		`SELECT to_vertex_id
 		FROM edges WHERE from_vertex_id = ? AND edge_family = ? AND edge_type = ? AND edge_name = ?;`,
-		edge.From, edge.Family, edge.Type, edge.Name,
-	).Consistency(gocql.One).Scan(&edge.To)
+		v.Id, e.Family, e.Type, e.Name,
+	).Consistency(gocql.One).Scan(&e.To)
 
-	// if the edge exists, then just return as edge is filled up with new data
-	if err == nil {
-		fmt.Println("edge found already, returning the old edge: ", edge.Family, ":", edge.Type, ":", edge.Name)
-		return nil
-	}
-
-	// Add the edge in the source vertex row
-	err = backend.session.Query(
-		`INSERT INTO edges (from_vertex_id, to_vertex_id, edge_family, edge_type, edge_name, edge_data)
-		VALUES (?, ?, ?, ?, ?, ?) IF NOT EXISTS;`,
-		edge.From, edge.To, edge.Family, edge.Type, edge.Name, edge.Data,
-	).Consistency(gocql.Two).Exec()
+	vertex := blend.Vertex{Id: e.To}
 
 	if err != nil {
-		return err
+		return vertex, err
 	}
 
-	// ownership edges are two way, for private key change and propogating events
-	return backend.session.Query(
-		`INSERT INTO vertices(vertex_id, from_vertex_id, edge_family, edge_type, edge_name)
-		VALUES (?, ?, ?, ?, ?) IF NOT EXISTS;`,
-		edge.To, edge.From, edge.Family, edge.Type, edge.Name,
-	).Consistency(gocql.Two).Exec()
+	err = GetVertex(&vertex)
 
-	return nil
+	return vertex, err
+
 }
 
-func (backend *CassandraStorage) AddVertex(vertex *blend.Vertex) error {
+func (backend *CassandraStorage) CreateEdge(v blend.Vertex, edge *blend.Edge) error {
+	return backend.session.Query(
+		`BEGIN BATCH
+			INSERT INTO edges (
+				from_vertex_id, to_vertex_id,
+				edge_family, edge_type,
+				edge_name, edge_data)
+			VALUES (?, ?, ?, ?, ?, ?) IF NOT EXISTS
+
+			INSERT INTO vertices(
+				vertex_id, from_vertex_id,
+				edge_family, edge_type,
+				edge_name)
+			VALUES (?, ?, ?, ?, ?) IF NOT EXISTS
+
+		APPLY BATCH;
+		`,
+		v.Id, edge.To, edge.Family, edge.Type, edge.Name, edge.Data,
+		edge.To, v.Id, edge.Family, edge.Type, edge.Name,
+	).Consistency(gocql.Two).Exec()
+}
+
+func (backend *CassandraStorage) CreateChildVertex(v, vc *blend.Vertex, e blend.Edge) error {
+	e.Family = "ownership"
+
+	vertex, err := backend.GetChildVertex(*v, e)
+
+	if err == nil {
+		vc.Id = vertex.Id
+		return backend.UpdateVertex(vc)
+	}
+
+	return backend.session.Query(
+		`BEGIN BATCH
+			INSERT INTO vertices (
+				vertex_id, vertex_name, vertex_type, public_data, private_data, private_key
+			) VALUES (?, ?, ?, ?, ?, ?)
+
+			INSERT INTO edges (
+				from_vertex_id, to_vertex_id,
+				edge_family, edge_type,
+				edge_name, edge_data)
+			VALUES (?, ?, ?, ?, ?, ?) IF NOT EXISTS
+
+			INSERT INTO vertices(
+				vertex_id, from_vertex_id,
+				edge_family, edge_type,
+				edge_name)
+			VALUES (?, ?, ?, ?, ?) IF NOT EXISTS
+
+		APPLY BATCH;`,
+		v.Id, v.Name, v.Type, v.Public, v.Private, v.PrivateKey,
+		v.Id, e.To, e.Family, e.Type, e.Name, e.Data,
+		e.To, v.Id, e.Family, e.Type, e.Name,
+	).Consistency(gocql.Two).Exec()
+}
+
+func (backend *CassandraStorage) CreateVertex(vertex *blend.Vertex) error {
 	err := backend.session.Query(
 		`INSERT INTO vertices (
 			vertex_id, vertex_name, vertex_type, public_data, private_data, private_key
@@ -274,7 +317,7 @@ func (backend *CassandraStorage) DeleteVertexTree(vertices []*blend.Vertex) erro
 	vertex := vertices[0]
 	vertices = vertices[1:]
 
-	backEdges, err := backend.GetEdges(blend.Edge{From: vertex.Id, Family: "ownership"})
+	backEdges, err := backend.GetEdges(*vertex, blend.Edge{Family: "ownership"})
 
 	if err != nil {
 		return err
