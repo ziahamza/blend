@@ -282,9 +282,9 @@ func (backend *CassandraStorage) CreateChildVertex(v, vc *blend.Vertex, e blend.
 			VALUES (?, ?, ?, ?, ?) IF NOT EXISTS
 
 		APPLY BATCH;`,
-		v.Id, v.Name, v.Type, v.Public, v.Private, v.PrivateKey,
-		v.Id, e.To, e.Family, e.Type, e.Name, e.Data,
-		e.To, v.Id, e.Family, e.Type, e.Name,
+		vc.Id, vc.Name, vc.Type, vc.Public, vc.Private, vc.PrivateKey,
+		vc.Id, e.To, e.Family, e.Type, e.Name, e.Data,
+		e.To, vc.Id, e.Family, e.Type, e.Name,
 	).Consistency(gocql.Two).Exec()
 }
 

@@ -88,6 +88,10 @@ func CreateChildVertex(v, vc *blend.Vertex, e blend.Edge) error {
 
 		vc.Id = string(vid.String())
 	}
+
+	e.To = vc.Id
+	e.From = v.Id
+
 	return backend.CreateChildVertex(v, vc, e)
 }
 
@@ -151,7 +155,12 @@ func PropogateChanges(vertex blend.Vertex, event blend.Event) error {
 }
 
 func ConfirmVertex(vid string) bool {
-	return backend.GetVertex(&blend.Vertex{Id: vid}) == nil
+	err := backend.GetVertex(&blend.Vertex{Id: vid})
+	if err != nil {
+		return false
+	}
+
+	return true
 }
 
 func ConfirmVertexKey(vid, vkey string) bool {

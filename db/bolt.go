@@ -152,7 +152,7 @@ func (backend *BoltStorage) CreateChildVertex(v, vc *blend.Vertex, e blend.Edge)
 		return UpdateVertex(vc)
 	}
 
-	vbytes, err := json.Marshal(v)
+	vbytes, err := json.Marshal(vc)
 	if err != nil {
 		return err
 	}
@@ -166,7 +166,7 @@ func (backend *BoltStorage) CreateChildVertex(v, vc *blend.Vertex, e blend.Edge)
 		vertexBucket := tx.Bucket([]byte("vertex"))
 		edgeBucket := tx.Bucket([]byte("edge"))
 
-		vertexBucket.Put([]byte(v.Id), vbytes)
+		vertexBucket.Put([]byte(vc.Id), vbytes)
 
 		edgeId := e.From + ":" + e.Family + ":" + e.Type + ":" + e.Name
 		edgeBucket.Put([]byte(edgeId), ebytes)

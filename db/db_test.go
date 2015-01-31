@@ -63,7 +63,7 @@ func testVertexTree(t *testing.T) {
 	}
 
 	if edges[0].Name != childEdge.Name || edges[0].To != childVertex.Id {
-		t.Error("got back different edge then expected")
+		t.Error("got back different edge then expected\n", childEdge, edges[0])
 		return
 	}
 
