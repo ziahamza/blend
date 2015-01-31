@@ -41,6 +41,43 @@ func GetVertex(v blend.Vertex) blend.APIResponse {
 	return blend.APIResponse{Success: true, Vertex: &v}
 }
 
+func GetChildVertex(v blend.Vertex, e blend.Edge) blend.APIResponse {
+	if v.Id == "" {
+		return blend.APIResponse{
+			Success: false,
+			Message: "Vertex ID not supplied",
+		}
+	}
+
+	e.Family = "ownership"
+
+	err := db.GetVertex(&v)
+	if err != nil {
+		return blend.APIResponse{
+			Success: false,
+			Message: err.Error(),
+		}
+	}
+
+	if e.Type == "" || e.Name == "" {
+		return blend.APIResponse{
+			Success: false,
+			Message: "Edge Type and Name for a child vertex have to be supplied",
+		}
+	}
+
+	vertex, err := db.GetChildVertex(v, e)
+
+	if err != nil {
+		return blend.APIResponse{Success: false, Message: err.Error()}
+	}
+
+	return blend.APIResponse{
+		Success: true,
+		Vertex:  &vertex,
+	}
+}
+
 func CreateChildVertex(vertex blend.Vertex, childVertex blend.Vertex, e blend.Edge) blend.APIResponse {
 	if vertex.Id == "" {
 		return blend.APIResponse{

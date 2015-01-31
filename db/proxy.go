@@ -72,14 +72,6 @@ func (db *ProxyStorage) GetAPIResponse(req blend.APIRequest) (blend.APIResponse,
 }
 
 func (db *ProxyStorage) GetVertex(v *blend.Vertex) error {
-	/*
-		err := db.cache.GetVertex(v)
-		if err == nil {
-			// vertex from cache found, return early
-			return nil
-		}
-	*/
-
 	resp, err := db.GetAPIResponse(blend.APIRequest{
 		Method: "/vertex/get",
 		Vertex: *v,
@@ -117,14 +109,60 @@ func (db *ProxyStorage) GetEdges(v blend.Vertex, e blend.Edge) ([]blend.Edge, er
 }
 
 func (db *ProxyStorage) GetChildVertex(v blend.Vertex, e blend.Edge) (blend.Vertex, error) {
-	return blend.Vertex{}, nil
+	resp, err := db.GetAPIResponse(blend.APIRequest{
+		Method: "/vertex/getChild",
+		Vertex: v,
+		Edge:   e,
+	})
+
+	if err != nil {
+		return blend.Vertex{}, err
+	}
+
+	if resp.Success == false {
+		return blend.Vertex{}, errors.New(resp.Message)
+	}
+
+	return *resp.Vertex, nil
 }
 
 func (db *ProxyStorage) CreateChildVertex(v, vc *blend.Vertex, e blend.Edge) error {
+	resp, err := db.GetAPIResponse(blend.APIRequest{
+		Method:      "/vertex/createChild",
+		Vertex:      *v,
+		ChildVertex: *vc,
+		Edge:        e,
+	})
+
+	if err != nil {
+		return err
+	}
+
+	if resp.Success == false {
+		return errors.New(resp.Message)
+	}
+
+	*vc = *resp.Vertex
+
 	return nil
 }
 
 func (db *ProxyStorage) CreateVertex(v *blend.Vertex) error {
+	resp, err := db.GetAPIResponse(blend.APIRequest{
+		Method: "/vertex/create",
+		Vertex: *v,
+	})
+
+	if err != nil {
+		return err
+	}
+
+	if resp.Success == false {
+		return errors.New(resp.Message)
+	}
+
+	*v = *resp.Vertex
+
 	return nil
 }
 
@@ -133,6 +171,22 @@ func (db *ProxyStorage) UpdateVertex(v *blend.Vertex) error {
 }
 
 func (db *ProxyStorage) CreateEdge(v blend.Vertex, e *blend.Edge) error {
+	resp, err := db.GetAPIResponse(blend.APIRequest{
+		Method: "/edge/create",
+		Vertex: v,
+		Edge:   *e,
+	})
+
+	if err != nil {
+		return err
+	}
+
+	if resp.Success == false {
+		return errors.New(resp.Message)
+	}
+
+	*e = *resp.Edge
+
 	return nil
 }
 
