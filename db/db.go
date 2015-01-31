@@ -107,6 +107,8 @@ func CreateEdge(v blend.Vertex, edge *blend.Edge) error {
 		edge.Name = edge.To
 	}
 
+	edge.From = v.Id
+
 	return backend.CreateEdge(v, edge)
 }
 
