@@ -202,7 +202,7 @@ func (backend *BoltStorage) UpdateVertex(v *blend.Vertex) error {
 	})
 }
 
-func (backend *BoltStorage) CreateEdge(v blend.Vertex, e *blend.Edge) error {
+func (backend *BoltStorage) CreateEdge(v, vc blend.Vertex, e *blend.Edge) error {
 	edges, err := GetEdges(v, blend.Edge{
 		Family: e.Family,
 		Name:   e.Name,

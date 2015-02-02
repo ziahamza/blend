@@ -105,7 +105,11 @@ func (db *ProxyStorage) GetEdges(v blend.Vertex, e blend.Edge) ([]blend.Edge, er
 		return nil, errors.New(resp.Message)
 	}
 
-	return nil, nil
+	if resp.Edges == nil {
+		return nil, errors.New("Edges not returned from source graph")
+	}
+
+	return *resp.Edges, nil
 }
 
 func (db *ProxyStorage) GetChildVertex(v blend.Vertex, e blend.Edge) (blend.Vertex, error) {
@@ -170,11 +174,12 @@ func (db *ProxyStorage) UpdateVertex(v *blend.Vertex) error {
 	return nil
 }
 
-func (db *ProxyStorage) CreateEdge(v blend.Vertex, e *blend.Edge) error {
+func (db *ProxyStorage) CreateEdge(v, vc blend.Vertex, e *blend.Edge) error {
 	resp, err := db.GetAPIResponse(blend.APIRequest{
-		Method: "/edge/create",
-		Vertex: v,
-		Edge:   *e,
+		Method:      "/edge/create",
+		Vertex:      v,
+		ChildVertex: vc,
+		Edge:        *e,
 	})
 
 	if err != nil {

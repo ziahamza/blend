@@ -231,7 +231,7 @@ func (backend *CassandraStorage) GetChildVertex(v blend.Vertex, e blend.Edge) (b
 
 }
 
-func (backend *CassandraStorage) CreateEdge(v blend.Vertex, edge *blend.Edge) error {
+func (backend *CassandraStorage) CreateEdge(v, vc blend.Vertex, edge *blend.Edge) error {
 	return backend.session.Query(
 		`BEGIN BATCH
 			INSERT INTO edges (
@@ -248,8 +248,8 @@ func (backend *CassandraStorage) CreateEdge(v blend.Vertex, edge *blend.Edge) er
 
 		APPLY BATCH;
 		`,
-		v.Id, edge.To, edge.Family, edge.Type, edge.Name, edge.Data,
-		edge.To, v.Id, edge.Family, edge.Type, edge.Name,
+		v.Id, vc.Id, edge.Family, edge.Type, edge.Name, edge.Data,
+		vc.Id, v.Id, edge.Family, edge.Type, edge.Name,
 	).Consistency(gocql.Two).Exec()
 }
 

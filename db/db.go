@@ -44,7 +44,7 @@ type Storage interface {
 
 	// Add a specific edge to the DB. fills in the Edge pointer with the new ID
 	// of the edge
-	CreateEdge(blend.Vertex, *blend.Edge) error
+	CreateEdge(blend.Vertex, blend.Vertex, *blend.Edge) error
 }
 
 var backend Storage
@@ -95,7 +95,7 @@ func CreateChildVertex(v, vc *blend.Vertex, e blend.Edge) error {
 	return backend.CreateChildVertex(v, vc, e)
 }
 
-func CreateEdge(v blend.Vertex, edge *blend.Edge) error {
+func CreateEdge(v, vc blend.Vertex, edge *blend.Edge) error {
 	if edge.Family != "ownership" && edge.Family != "private" &&
 		edge.Family != "public" && edge.Family != "event" {
 		return errors.New("Edge Family not supported")
@@ -108,8 +108,9 @@ func CreateEdge(v blend.Vertex, edge *blend.Edge) error {
 	}
 
 	edge.From = v.Id
+	edge.To = vc.Id
 
-	return backend.CreateEdge(v, edge)
+	return backend.CreateEdge(v, vc, edge)
 }
 
 func CreateVertex(vertex *blend.Vertex) error {

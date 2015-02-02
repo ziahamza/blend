@@ -114,6 +114,9 @@ func CreateChildVertex(vertex blend.Vertex, childVertex blend.Vertex, e blend.Ed
 		}
 	}
 
+	e.From = vertex.Id
+	e.To = childVertex.Id
+
 	fmt.Printf("Added a child vertex %s with edge %s successfully! \n", childVertex.Id, e.Name)
 
 	// if private key the source not specified, hide private data for new child
@@ -141,20 +144,6 @@ func CreateVertex(v blend.Vertex) blend.APIResponse {
 		return blend.APIResponse{
 			Success: false,
 			Message: "Vertex type not specified ...",
-		}
-	}
-
-	if v.Public == "" {
-		return blend.APIResponse{
-			Success: false,
-			Message: "Vertex type not specified ...",
-		}
-	}
-
-	if v.Private == "" {
-		return blend.APIResponse{
-			Success: false,
-			Message: "Vertex private data left empty ... ",
 		}
 	}
 

@@ -135,7 +135,7 @@ func CreateEdge(sourceVertex, destVertex blend.Vertex, e blend.Edge) blend.APIRe
 		}
 	}
 
-	err = db.CreateEdge(sourceVertex, &e)
+	err = db.CreateEdge(sourceVertex, destVertex, &e)
 	if err != nil {
 		return blend.APIResponse{
 			Success: false,

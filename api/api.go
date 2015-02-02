@@ -18,7 +18,7 @@ func HandleRequest(req blend.APIRequest) blend.APIResponse {
 
 	case "/vertex/get":
 		return GetVertex(req.Vertex)
-	case "vertex/createChild":
+	case "vertex/getChild":
 		return GetChildVertex(req.Vertex, req.Edge)
 
 	case "/vertex/create":
