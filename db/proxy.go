@@ -109,7 +109,7 @@ func (db *ProxyStorage) GetEdges(v blend.Vertex, e blend.Edge) ([]blend.Edge, er
 		return nil, errors.New("Edges not returned from source graph")
 	}
 
-	return *resp.Edges, nil
+	return resp.Edges, nil
 }
 
 func (db *ProxyStorage) GetChildVertex(v blend.Vertex, e blend.Edge) (blend.Vertex, error) {
